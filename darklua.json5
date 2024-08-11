@@ -1,0 +1,12 @@
+{
+	bundle: {
+		require_mode: {
+			name: "path",
+			sources: {
+				"@lib": "/home/matt/projects/packages/lune/src",
+				"@pkg": "/home/matt/projects/packages/lune/pkg",
+			},
+		},
+		excludes: [ "@lune/**" ],
+	},
+}

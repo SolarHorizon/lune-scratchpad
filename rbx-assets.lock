@@ -1,0 +1,1 @@
+{"places":{"assets":{"installer":{"script":"workspaceFolders"},"placeId":15472100873.0,"version":107},"default":{"installer":{"exclude":{"isA":["LuaSourceContainer"],"names":[".ignore*"]},"script":"@default"},"placeId":13593487680.0,"version":1148}}}

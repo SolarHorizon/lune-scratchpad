@@ -1,0 +1,6 @@
+[package]
+exclude = ["**/*.spec.luau"]
+name = "rustic/result"
+realm = "shared"
+registry = "https://github.com/solarhorizon/wally-index"
+version = "0.3.0"

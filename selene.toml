@@ -1,0 +1,4 @@
+std = "luau"
+
+[lints]
+global_usage = "allow"

@@ -1,0 +1,110 @@
+local fs = require("@lune/fs")
+local process = require("@lune/process")
+local serde = require("@lune/serde")
+
+local Result = require("@lib/Result")
+local efs = require("@lib/efs")
+local immutable = require("@lib/immutable")
+
+local Error = require("../Error")
+local types = require("../types")
+
+type Error = Error.Error
+type Result<T> = Result.Result<T, Error>
+type Config = types.Config
+type PlaceConfig = types.PlaceConfig
+type InstallerConfig = types.InstallerConfig
+type RawConfig = types.RawConfig
+type RawPlaceConfig = types.RawPlaceConfig
+
+local Err = Result.Err
+local map = immutable.map
+local merge = immutable.merge
+local Config = types.Config
+local RawConfig = types.RawConfig
+
+local PLACE_DEFAULT = {
+	output = "./assets",
+	installer = {
+		script = "default",
+	},
+}
+
+local FILE_FORMATS: { [string]: any } = {
+	toml = "toml",
+	yml = "yaml",
+	yaml = "yaml",
+	json = "json",
+}
+
+local FILE = "rbx-assets"
+
+local function createInstallerConfig(
+	value: string | InstallerConfig
+): InstallerConfig
+	if typeof(value) == "string" then
+		return { script = value }
+	end
+
+	return value
+end
+
+local function createPlaceConfig(value: RawPlaceConfig): PlaceConfig
+	return merge(merge(PLACE_DEFAULT, value), {
+		installer = createInstallerConfig(value.installer),
+	})
+end
+
+--[=[
+	@within rbx-assets
+
+	Gets the rbx-assets config from the `rbx-assets.yml` file found in the given directory.
+	If no directory is given, uses the current working directory.
+]=]
+local function readConfig(projectPath: string?): Result<Config>
+	local path = efs.normalizePath(`{projectPath or process.cwd}`)
+	local file: string? = nil
+	local format: serde.EncodeDecodeFormat
+
+	for ext, fmt in FILE_FORMATS do
+		local config = `{path}/{FILE}.{ext}`
+
+		if fs.isFile(config) then
+			file = config
+			format = fmt
+			break
+		end
+	end
+
+	if not file then
+		return Err(Error.NoConfig(`{FILE}`))
+	end
+
+	return Result.from(fs.readFile, file)
+		:mapErr(function(err)
+			return Error.ReadError(FILE, tostring(err))
+		end)
+		:andThen(function(content)
+			return Result.from(serde.decode, format, content)
+				:mapErr(function(err)
+					return Error.ParseError(FILE):append("\n" .. tostring(err))
+				end)
+		end)
+		:andThen(function(config)
+			return Result.fromGtType(RawConfig, config):mapErr(function(err)
+				return Error.InvalidConfig(err)
+			end)
+		end)
+		:map(function(config)
+			return merge(config, {
+				places = map(config.places, createPlaceConfig),
+			})
+		end)
+		:andThen(function(config)
+			return Result.fromGtType(Config, config):mapErr(function(err)
+				return Error.InvalidConfig(err)
+			end)
+		end)
+end
+
+return readConfig
