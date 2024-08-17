@@ -13,12 +13,18 @@ local Asset = {
 
 export type Asset = typeof(Asset)
 
+local BatchAssetError = {
+	code = gt.number(),
+	message = gt.string(),
+}
+
 local BatchAsset = {
 	IsCopyrightProtected = gt.boolean(),
 	IsHashDynamic = gt.boolean(),
 	isArchived = gt.boolean(),
 	requestId = gt.string(),
-	location = gt.string(),
+	location = gt.opt(gt.string()),
+	errors = gt.opt(gt.array(BatchAssetError)),
 }
 
 export type BatchAsset = typeof(BatchAsset)

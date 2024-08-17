@@ -16,6 +16,10 @@ local function getAuthCookie(override: string?): Result<string>
 		return Err(Error.MissingAuthCookie())
 	end
 
+	if string.match(cookie, "^.ROBLOSECURITY=(.+); Domain=.roblox.com$") then
+		return Ok(cookie)
+	end
+
 	return Ok(`.ROBLOSECURITY={cookie}; Domain=.roblox.com`)
 end
 

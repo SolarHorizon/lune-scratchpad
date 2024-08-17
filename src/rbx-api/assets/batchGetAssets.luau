@@ -4,7 +4,7 @@ local Result = require("@lib/Result")
 local gt = require("@pkg/greentea")
 local jsonDecode = require("@lib/request/jsonDecode")
 local request = require("@lib/request/sync")
-local withCookie = require("@lib/rbx-api/withCookie")
+local withCookie = require("../withCookie")
 
 local Error = require("../Error")
 local types = require("./types")
@@ -52,7 +52,7 @@ end
 --[=[
 	@within rbx-api
 
-	Batch download assets from the Roblox website
+	Batch get asset information from the Roblox website
 ]=]
 local batchGetAssets = withCookie(
 	function(cookie, assets: { AssetRequestItem }): Result<{ BatchAsset }>
@@ -61,7 +61,7 @@ local batchGetAssets = withCookie(
 				return createRequest(assetRequests, cookie)
 			end)
 			:andThen(function(body)
-				return jsonDecode(body, gt.array(types.BatchAsset))
+				return jsonDecode(body), gt.array(types.BatchAsset)
 			end)
 	end
 )
