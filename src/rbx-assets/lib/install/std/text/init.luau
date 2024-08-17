@@ -1,9 +1,9 @@
-local createExclude = require("./createExclude")
+local createUnique = require("./createUnique")
 local globrex = require("./globrex")
 local sanitize = require("./sanitize")
 
 return {
-	sanitize = sanitize,
+	createUnique = createUnique,
 	globrex = globrex,
-	createExclude = createExclude,
+	sanitize = sanitize,
 }

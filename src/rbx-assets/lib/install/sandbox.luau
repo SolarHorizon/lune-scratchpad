@@ -1,4 +1,3 @@
--- local process = require("@lune/process")
 local datetime = require("@lune/datetime")
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -9,8 +8,13 @@ local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 local task = require("@lune/task")
 
+local installer = require("./std/installer")
+local instance = require("./std/instance")
+local text = require("./std/text")
+
 local Error = require("../Error")
 local Result = require("@lib/Result")
+local constants = require("../constants")
 local types = require("./types")
 
 type Error = Error.Error
@@ -18,50 +22,10 @@ type Result<T> = Result.Result<T, Error>
 type InstanceTree = types.InstanceTree
 type Installer = types.Installer
 
-local function lock<T>(table: T)
-	return setmetatable(table :: any, {
-		__index = table,
-		__metatable = "locked",
-		__tostring = function()
-			return stdio.format(table)
-		end,
-	})
-end
+local WRITE = stdio.write
+local EWRITE = stdio.ewrite
 
-local ENABLED_LIBRARIES = {
-	["@lune/net"] = {
-		urlEncode = net.urlEncode,
-		urlDecode = net.urlDecode,
-		jsonEncode = net.jsonEncode,
-		jsonDecode = net.jsonDecode,
-	},
-	["@lune/roblox"] = {
-		Instance = roblox.Instance,
-		getReflectionDatabase = roblox.getReflectionDatabase,
-	},
-	["@lune/stdio"] = {
-		color = stdio.color,
-		format = stdio.format,
-		prompt = stdio.prompt,
-		style = stdio.style,
-		write = stdio.write,
-		ewrite = stdio.ewrite,
-	},
-	["@lune/datetime"] = lock(datetime),
-	["@lune/serde"] = lock(serde),
-	["@lune/regex"] = lock(regex),
-	["@lune/task"] = lock(task),
-}
-
-local sandboxEnv = {}
-
-function sandboxEnv.getfenv()
-	error("getfenv is disabled for install scripts")
-end
-
-function sandboxEnv.setfenv()
-	error("setfenv is disabled for install scripts")
-end
+local PROG_NAME = constants.PROG_NAME
 
 local function readScript(target: string): string
 	local content: string
@@ -97,36 +61,95 @@ local function readScript(target: string): string
 	return content
 end
 
-function sandboxEnv.require(target: string)
-	local module = ENABLED_LIBRARIES[target]
-
-	if module then
-		return module
-	else
-		local contents = readScript(target)
-
-		local evalChunk = luau.load(contents, sandboxEnv)
-		return evalChunk()
-	end
-end
-
 local function sandbox(filePath: string): Result<Installer>
-	local environment = table.clone(sandboxEnv)
+	local environment = {}
 
-	function environment.print(...)
-		local header = `---- Output from {filePath} ----`
-		print(header)
-		print(tostring(...))
-		print(string.rep("-", #header))
+	local tag = `[installer "{filePath}"]`
+
+	local function write(s: string)
+		WRITE(`{tag} {s}`)
+	end
+
+	local function ewrite(s: string)
+		EWRITE(`{tag} {s}`)
+	end
+
+	environment.print = function(...)
+		WRITE(`\n{tag}`)
+
+		for i = 1, select("#", ...) do
+			WRITE(` {stdio.format(select(i, ...))}`)
+		end
 	end
 
 	function environment.warn(...)
-		environment.print(stdio.color("yellow"), ..., stdio.color("reset"))
+		EWRITE(`\n{tag}`)
+		EWRITE(stdio.color("yellow"))
+
+		for i = 1, select("#", ...) do
+			EWRITE(` {stdio.format(select(i, ...))}`)
+		end
+
+		EWRITE(stdio.color("reset"))
+	end
+
+	local ENABLED_LIBRARIES = {
+		["@lune/net"] = {
+			urlEncode = net.urlEncode,
+			urlDecode = net.urlDecode,
+			jsonEncode = net.jsonEncode,
+			jsonDecode = net.jsonDecode,
+		},
+		["@lune/roblox"] = {
+			Instance = roblox.Instance,
+			getReflectionDatabase = roblox.getReflectionDatabase,
+		},
+		["@lune/stdio"] = {
+			color = stdio.color,
+			format = stdio.format,
+			prompt = stdio.prompt,
+			style = stdio.style,
+			write = write,
+			ewrite = ewrite,
+		},
+		["@lune/datetime"] = datetime,
+		["@lune/serde"] = serde,
+		["@lune/regex"] = regex,
+		["@lune/task"] = task,
+
+		-- luau type system doesn't like PROG_NAME
+		[`@{PROG_NAME}/installer`] = installer :: any,
+		[`@{PROG_NAME}/instance`] = instance,
+		[`@{PROG_NAME}/text`] = text,
+	}
+
+	function environment.getfenv()
+		error("getfenv is disabled for install scripts")
+	end
+
+	function environment.setfenv()
+		error("setfenv is disabled for install scripts")
+	end
+
+	function environment.require(target: string)
+		local module = ENABLED_LIBRARIES[target]
+
+		if module then
+			return module
+		else
+			local contents = readScript(target)
+
+			local evalChunk = luau.load(contents, {
+				debugName = target,
+				environment = environment,
+			})
+			return evalChunk()
+		end
 	end
 
 	return Result.from(readScript, filePath)
 		:mapErr(function()
-			return (Error.InvalidInstallerPath(filePath))
+			return Error.InvalidInstallerPath(filePath)
 		end)
 		:andThen(function(content)
 			return Result.from(
@@ -134,11 +157,15 @@ local function sandbox(filePath: string): Result<Installer>
 				content,
 				table.freeze({
 					debugName = filePath,
-					environment = sandboxEnv,
+					environment = table.freeze(environment),
 				})
-			):mapErr(function(err)
-				return Error.InstallerError(tostring(err))
-			end)
+			)
+				:andThen(function(install)
+					return Result.from(install)
+				end)
+				:mapErr(function(err)
+					return Error.InstallerError(tostring(err))
+				end)
 		end)
 end
 

@@ -1,5 +1,4 @@
 local fs = require("@lune/fs")
-local process = require("@lune/process")
 local serde = require("@lune/serde")
 
 local Option = require("@lib/Option")
@@ -27,8 +26,8 @@ local FILE = "rbx-assets.lock"
 	Gets the rbx-assets lockfile from the `rbx-assets.lock` file found in the given directory.
 	If no directory is given, uses the current working directory.
 ]=]
-local function readLockfile(projectPath: string?): Result<Option<Lockfile>>
-	local file = efs.normalizePath(`{projectPath or process.cwd}/{FILE}`)
+local function readLockfile(projectPath: string): Result<Option<Lockfile>>
+	local file = efs.normalizePath(`{projectPath}/{FILE}`)
 
 	if not fs.isFile(file) then
 		return Ok(None())

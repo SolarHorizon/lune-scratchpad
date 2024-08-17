@@ -1,37 +1,64 @@
 local roblox = require("@lune/roblox")
 
-local createExclude = require("../std/createExclude")
-local find = require("../std/find")
-local sanitize = require("../std/sanitize")
+local instance = require("../std/instance")
+local text = require("../std/text")
 
-type InstanceTree = roblox.Instance | {
-	[string]: InstanceTree,
+type Instance = roblox.Instance
+
+type InstanceTree = {
+	[string]: Instance | InstanceTree,
 }
+
+type CombineBehavior = "error" | "rename"
+
+local function combine(behavior: CombineBehavior?, ...: InstanceTree)
+	local new = {}
+
+	local unique = text.createUnique()
+
+	for i = 1, select("#", ...) do
+		for name, instance in select(i, ...) do
+			if new[name] then
+				if behavior == "error" then
+					error(
+						`Failed to combine trees because name '{name}' was already used.`
+					)
+				end
+			end
+
+			new[unique(name)] = instance
+		end
+	end
+
+	return new
+end
 
 local function foldersIn(
 	game: roblox.Instance,
 	options: {
-		roots: { [string]: string },
+		roots: { [string]: { string } },
 		recursive: boolean?,
-		exclude: createExclude.Options,
+		exclude: instance.FilterOptions?,
+		combineBehavior: CombineBehavior?,
 	}
 )
+	assert(
+		typeof(options.roots) == "table",
+		`Expected 'roots' to be an array of glob paths`
+	)
+
 	local function collectFolders(
 		root: roblox.Instance,
 		recursive: boolean?
 	): InstanceTree
-		local exclude = createExclude(options.exclude)
+		local filter = instance.createFilter(options.exclude)
 
-		local folders = {}
+		local folders: InstanceTree = {}
 
-		for _, instance in root:GetChildren() do
-			if exclude(instance) then
-				continue
-			end
+		for _, child in filter(root):GetChildren() do
+			local name = text.sanitize(child.Name)
 
-			local name = sanitize(instance.Name)
-
-			if instance:IsA("Folder") then
+			if child:IsA("Folder") then
 				local exists = folders[name]
 
 				if exists then
@@ -43,9 +70,9 @@ local function foldersIn(
 				end
 
 				if recursive then
-					folders[name] = collectFolders(instance, recursive)
+					folders[name] = collectFolders(child, recursive)
 				else
-					folders[name] = instance
+					folders[name] = child
 				end
 			end
 		end
@@ -55,8 +82,21 @@ local function foldersIn(
 
 	local children = {}
 
-	for name, path in options.roots do
-		children[name] = collectFolders(find(game, path))
+	for name, paths in options.roots do
+		local root = {}
+
+		for _, path in paths do
+			local tree = collectFolders(instance.find(game, path))
+
+			if typeof(tree) ~= "table" then
+				warn("Non-folder instance at root", tree.ClassName, tree.Name)
+				continue
+			end
+
+			root = combine(options.combineBehavior, root, tree)
+		end
+
+		children[name] = root
 	end
 
 	return children

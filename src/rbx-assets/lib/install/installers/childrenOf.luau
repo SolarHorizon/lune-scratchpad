@@ -1,31 +1,26 @@
 local roblox = require("@lune/roblox")
 
-local createExclude = require("../std/createExclude")
-local find = require("../std/find")
-local sanitize = require("../std/sanitize")
+local instance = require("../std/instance")
+local text = require("../std/text")
 
 local function childrenOf(
 	game: roblox.DataModel,
 	options: {
 		roots: { [string]: string },
-		exclude: createExclude.Options,
+		exclude: instance.FilterOptions,
 	}
 )
-	local exclude = createExclude(options.exclude)
+	local filter = instance.createFilter(options.exclude)
 
 	local allChildren = {}
 
 	for dirName, path in options.roots do
-		local root = find(game, path)
+		local root = filter(instance.find(game, path))
 
 		local children = {}
 
 		for _, instance in root:GetChildren() do
-			if exclude(instance) then
-				continue
-			end
-
-			local name = sanitize(instance.Name)
+			local name = text.sanitize(instance.Name)
 
 			if children[name] then
 				print(

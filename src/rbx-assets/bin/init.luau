@@ -1,20 +1,15 @@
-local fs = require("@lune/fs")
-local serde = require("@lune/serde")
-
+local cli = require("../cli")
 local dotenv = require("@lib/dotenv")
+local stdio = require("@lune/stdio")
 
-local env = dotenv()
+dotenv()
 
-local generateLock = require("../lib/config/generateLock")
-
-generateLock(env.RBX_ASSETS_KEY :: string):after(function(lockfile)
-	lockfile:match({
-		Ok = function(content)
-			fs.writeFile("./rbx-assets.lock", serde.encode("json", content))
-			print("Created rbx-assets.lock")
-		end,
-		Err = function(err)
-			print(tostring(err))
-		end,
-	})
-end)
+cli.run():match({
+	Ok = function()
+		return 0
+	end,
+	Err = function(err)
+		stdio.ewrite(tostring(err))
+		return 1
+	end,
+})

@@ -30,6 +30,10 @@ local PLACE_DEFAULT = {
 	},
 }
 
+local DEFAULT_INSTALLER = {
+	script = "@workspaceAndLighting",
+}
+
 local FILE_FORMATS: { [string]: any } = {
 	toml = "toml",
 	yml = "yaml",
@@ -40,8 +44,13 @@ local FILE_FORMATS: { [string]: any } = {
 local FILE = "rbx-assets"
 
 local function createInstallerConfig(
-	value: string | InstallerConfig
+	value: (string | InstallerConfig)?,
+	defaultInstaller: InstallerConfig?
 ): InstallerConfig
+	if not value then
+		return defaultInstaller or DEFAULT_INSTALLER
+	end
+
 	if typeof(value) == "string" then
 		return { script = value }
 	end
@@ -49,9 +58,12 @@ local function createInstallerConfig(
 	return value
 end
 
-local function createPlaceConfig(value: RawPlaceConfig): PlaceConfig
+local function createPlaceConfig(
+	value: RawPlaceConfig,
+	defaultInstaller: InstallerConfig?
+): PlaceConfig
 	return merge(merge(PLACE_DEFAULT, value), {
-		installer = createInstallerConfig(value.installer),
+		installer = createInstallerConfig(value.installer or defaultInstaller),
 	})
 end
 
@@ -95,9 +107,11 @@ local function readConfig(projectPath: string?): Result<Config>
 				return Error.InvalidConfig(err)
 			end)
 		end)
-		:map(function(config)
+		:map(function(config: RawConfig)
 			return merge(config, {
-				places = map(config.places, createPlaceConfig),
+				places = map(config.places, function(place)
+					return createPlaceConfig(place, config.defaultInstaller)
+				end),
 			})
 		end)
 		:andThen(function(config)

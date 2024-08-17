@@ -1,33 +1,17 @@
 local roblox = require("@lune/roblox")
 
-local createExclude = require("../std/createExclude")
+local instance = require("../std/instance")
 
-local function workspaceAndLighting(
-	game: roblox.DataModel,
-	options: {
-		exclude: createExclude.Options,
-	}
-)
-	local exclude = createExclude(options.exclude)
+type Options = {
+	exclude: instance.FilterOptions,
+}
 
-	local workspace = game:GetService("Workspace")
-	local lighting = game:GetService("Lighting")
-
-	for _, child in workspace:GetDescendants() do
-		if exclude(child) then
-			child:Destroy()
-		end
-	end
-
-	for _, child in lighting:GetDescendants() do
-		if exclude(child) then
-			child:Destroy()
-		end
-	end
+local function workspaceAndLighting(game: roblox.DataModel, options: Options)
+	local filter = instance.createFilter(options.exclude)
 
 	return {
-		Workspace = workspace,
-		Lighting = lighting,
+		Workspace = filter(game:GetService("Workspace")),
+		Lighting = filter(game:GetService("Lighting")),
 	}
 end
 

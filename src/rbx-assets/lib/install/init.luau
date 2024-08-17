@@ -1,22 +1,19 @@
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 
-local gt = require("@pkg/greentea")
-
 local Future = require("@lib/Future")
 local Iter = require("@lib/Iter")
 local Result = require("@lib/Result")
 local batchGetAssets = require("@lib/rbx-api/assets/batchGetAssets")
-local request = require("@lib/request/sync")
 local withCookie = require("@lib/rbx-api/withCookie")
 
 local Error = require("../Error")
+local download = require("../download")
 local installers = require("./installers")
-local rbxDecode = require("./rbxDecode")
 local sandbox = require("./sandbox")
 local types = require("./types")
 
-local Ok = Result.Ok
+local Ok, Err = Result.Ok, Result.Err
 
 type AssetRequestItem = batchGetAssets.AssetRequestItem
 type BatchAsset = batchGetAssets.BatchAsset
@@ -33,35 +30,54 @@ type LoadedPlace = {
 	name: string,
 	dataModel: DataModel,
 	installer: types.InstallerConfig,
+	output: string,
 }
-
-local download = withCookie(function(cookie, name, url)
-	return request({
-			url = url,
-			method = "GET",
-			headers = { Cookie = cookie },
-		})
-		:mapErr(function(err)
-			return Error.DownloadPlaceError(name, tostring(err))
-		end)
-		:andThen(function(body)
-			return rbxDecode(body, "place", gt.isA.DataModel)
-		end)
-end)
 
 local function prepareDataModels(
 	results: { [string]: Result<DataModel> },
 	lockfile: Lockfile
 )
 	return Iter.new(results)
-		:map(function(name, game)
-			return {
-				name = name,
-				dataModel = game,
-				installer = lockfile.places[name].installer,
-			}
+		:map(function(name, result: Result<DataModel>)
+			return result:map(function(dataModel)
+				return {
+					name = name,
+					dataModel = dataModel,
+					installer = lockfile.places[name].installer,
+					output = lockfile.places[name].output,
+				}
+			end)
 		end)
 		:intoResult()
+end
+
+local function downloadBatchResults(cookie, batch: { BatchAsset }, idMap)
+	local new = {}
+
+	for i, asset in batch do
+		local place = idMap[i]
+
+		if asset.location then
+			new[place.name] = download(cookie, place, asset.location)
+			continue
+		end
+
+		new[place.name] = Future.new(function()
+			if not asset.errors then
+				return Err(Error.UnknownDownloadPlaceError(place.name))
+			end
+
+			local message = ""
+
+			for _, err in asset.errors do
+				message ..= `{err.message} ({err.code})\n`
+			end
+
+			return Err(Error.DownloadPlaceError(place.name, message))
+		end)
+	end
+
+	return new
 end
 
 local function batchGetFromLockfile(
@@ -72,9 +88,16 @@ local function batchGetFromLockfile(
 	local idMap = {}
 
 	for name, place in lockfile.places do
-		table.insert(idMap, name)
 		table.insert(assets, {
 			assetId = place.placeId,
+			version = place.version,
+		})
+
+		-- we can't reuse `assets` because it's being sent directly to the api and
+		-- shouldn't contain any additional information
+		table.insert(idMap, {
+			name = name,
+			placeId = place.placeId,
 			version = place.version,
 		})
 	end
@@ -84,15 +107,8 @@ local function batchGetFromLockfile(
 		:mapErr(function(err)
 			return Error.BatchGetAssetError(tostring(err))
 		end)
-		:andThen(function(batch: { BatchAsset })
-			local new = {}
-
-			for i, asset in batch do
-				local name = idMap[i]
-				new[name] = download(cookie, name, asset.location)
-			end
-
-			return Ok(Future.awaitAll(new))
+		:map(function(batch: { BatchAsset })
+			return Future.awaitAll(downloadBatchResults(cookie, batch, idMap))
 		end)
 		:andThen(function(results)
 			return prepareDataModels(results, lockfile)
@@ -111,7 +127,7 @@ local function buildTree(root: string, tree: InstanceTree)
 
 	for name, child in tree :: { [string]: InstanceTree } do
 		if typeof(child) == "table" then
-			buildTree(`{root}/{name}.rbxm`, child)
+			buildTree(`{root}/{name}`, child)
 		else
 			fs.writeFile(`{root}/{name}.rbxm`, roblox.serializeModel({ child }))
 		end
@@ -120,11 +136,7 @@ local function buildTree(root: string, tree: InstanceTree)
 	return root
 end
 
-local function getInstaller(installer: string?): Result<Installer>
-	if not installer then
-		return Ok(installers.default)
-	end
-
+local function getInstaller(installer: string): Result<Installer>
 	local builtin = string.match(installer, "^@(.+)")
 
 	if builtin and installers[builtin] then
@@ -146,14 +158,14 @@ local function installPlaces(places: { [string]: LoadedPlace }): Result<{}>
 					)
 				end)
 				:andThen(function(tree: InstanceTree)
-					return Result.from(buildTree, place.installer.script, tree)
+					return Result.from(buildTree, place.output, tree)
 				end)
 		end)
 		:intoResult()
 end
 
 local install = withCookie(
-	function(cookie: string, lockfile: Lockfile): Result<{}>
+	function(cookie: string?, lockfile: Lockfile): Result<{}>
 		return batchGetFromLockfile(cookie, lockfile):andThen(installPlaces)
 	end
 )

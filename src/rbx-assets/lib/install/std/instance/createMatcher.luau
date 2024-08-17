@@ -1,5 +1,6 @@
-local globrex = require("../std/globrex")
 local roblox = require("@lune/roblox")
+
+local globrex = require("../text/globrex")
 
 export type Options = {
 	isA: { string }?,
@@ -18,7 +19,7 @@ local function isA(instance: roblox.Instance, classes: { string })
 	return false
 end
 
-local function createExcludes(options: Options)
+local function createMatcher(options: Options)
 	local matchers: { [string]: Matcher } = {}
 
 	if options then
@@ -58,4 +59,4 @@ local function createExcludes(options: Options)
 	end
 end
 
-return createExcludes
+return createMatcher
