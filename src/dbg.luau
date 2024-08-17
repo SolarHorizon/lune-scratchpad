@@ -1,17 +1,8 @@
 local stdio = require("@lune/stdio")
 
-local function log(...)
+local function dbg<T...>(...: T...): T...
 	print(stdio.color("cyan") .. "[debug]" .. stdio.color("reset"), ...)
-end
-
-local function dbg<T>(value: T, inspect: ((T) -> ...any)?): T
-	if inspect then
-		log(inspect(value))
-	else
-		log(value)
-	end
-
-	return value
+	return ...
 end
 
 return dbg
