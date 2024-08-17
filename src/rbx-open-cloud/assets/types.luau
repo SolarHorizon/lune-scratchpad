@@ -38,8 +38,8 @@ local Asset = {
 	revisionId = gt.string(),
 	revisionCreateTime = gt.string(),
 	moderationResult = ModerationResult,
-	icon = gt.string(),
-	preview = gt.array(Preview),
+	icon = gt.opt(gt.string()),
+	preview = gt.opt(gt.array(Preview)),
 }
 
 export type Asset = typeof(Asset)

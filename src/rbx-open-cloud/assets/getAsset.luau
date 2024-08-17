@@ -8,13 +8,17 @@ local types = require("./types")
 
 type Asset = types.Asset
 
-local function getAsset(apiKey: string, assetId: number, readMask: { string })
+local function getAsset(apiKey: string, assetId: number, readMask: { string }?)
+	if readMask then
+		readMask = net.urlEncode(table.concat(readMask, ",")) :: any
+	end
+
 	return Future.new(function()
 		return request({
-			url = `https://apis.roblox.com/v1/assets/{assetId}`,
+			url = `https://apis.roblox.com/assets/v1/assets/{assetId}`,
 			method = "GET",
 			query = {
-				readMask = net.urlEncode(table.concat(readMask, ",")),
+				readMask = readMask :: any,
 			},
 			headers = {
 				["x-api-key"] = apiKey,
