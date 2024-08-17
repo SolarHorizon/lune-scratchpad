@@ -4,6 +4,7 @@ local eprint = require("./eprint")
 local errPrint = require("./errPrint")
 local style = require("./style")
 local warn = require("./warn")
+local wrap = require("./wrap")
 
 --[=[
 	@class term
@@ -17,4 +18,5 @@ return {
 	errPrint = errPrint,
 	style = style,
 	warn = warn,
+	wrap = wrap,
 }

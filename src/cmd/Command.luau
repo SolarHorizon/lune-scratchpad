@@ -32,6 +32,19 @@ local DEFAULT_TERM_WIDTH = 80
 local Command = {}
 Command.__index = Command
 
+--- @interface CommandConfig
+--- .name string
+--- .about string?
+--- .author string?
+--- .afterHelp string?
+--- .beforeHelp string?
+--- .version string?
+--- .termWidth number?
+--- .subcommands { [string]: CommandConfig }
+--- .subcommandRequired boolean?
+--- .argRequiredElseHelp boolean
+--- .args { [string]: ArgConfig }
+
 type CommandConfig<Name, TermWidth, Args, Subcommands> = {
 	name: Name,
 	about: string?,
@@ -43,6 +56,7 @@ type CommandConfig<Name, TermWidth, Args, Subcommands> = {
 	args: Args,
 	subcommands: Subcommands,
 	subcommandRequired: boolean?,
+	argRequiredElseHelp: boolean,
 }
 
 export type SubcommandConfig = CommandConfig<
@@ -65,11 +79,12 @@ export type Command = typeof(setmetatable(
 		_shorts: { [string]: Arg },
 		_aliases: { string },
 		_globals: { [string]: Arg },
-		_shortAliases: { string },
 		_required: { [string]: Arg },
 		_options: { Arg },
 		_positional: { Arg },
 		_longs: { [string]: Arg },
+		_parent: Command?,
+		_positionalArgRequired: boolean?,
 		_config: CommandConfig<
 			string,
 			number,
@@ -80,6 +95,9 @@ export type Command = typeof(setmetatable(
 	Command
 ))
 
+--- Constructs a new Command.
+---
+--- This name is displayed to the user when they request to print help and information.
 function Command.new(name: string): Command
 	return setmetatable({
 		_config = {
@@ -87,6 +105,7 @@ function Command.new(name: string): Command
 			args = {},
 			subcommands = {},
 			termWidth = DEFAULT_TERM_WIDTH,
+			argRequiredElseHelp = true,
 		},
 		_aliases = {},
 		_globals = {},
@@ -94,7 +113,6 @@ function Command.new(name: string): Command
 		_options = {},
 		_positional = {},
 		_required = {},
-		_shortAliases = {},
 		_shorts = {},
 	}, Command)
 end
@@ -133,6 +151,8 @@ local deserialize = {
 	end,
 }
 
+--- Constructs a new Command from a `Config`.
+--- @param config CommandConfig
 function Command.from(config: Config): Command
 	local command = Command.new(config.name)
 
@@ -161,33 +181,64 @@ function Command.from(config: Config): Command
 	return command
 end
 
+--- Sets the version for `--version` and help messages
 function Command.version(self: Command, version: string): Command
 	self._config.version = version
 	return self
 end
 
+--- Sets the author(s) for the help message
+---
+--- :::note This does not appear in the default help message, and there is no way to create a custom help message yet.:::
 function Command.author(self: Command, name: string): Command
 	self._config.author = name
 	return self
 end
 
+--- Sets the program's description for the help message.
 function Command.about(self: Command, about: string): Command
 	self._config.about = about
 	return self
 end
 
+--- Free form text that is printed after help information
+---
+--- This is sometimes used to describe how to use the arguments, caveats to be noted, or license and contact information.
 function Command.afterHelp(self: Command, help: string): Command
 	self._config.afterHelp = help
 	return self
 end
 
+--- Free form text that is printed before help information
+---
+--- This is sometimes used for header, copyright, or license information.
 function Command.beforeHelp(self: Command, help: string): Command
 	self._config.beforeHelp = help
 	return self
 end
 
+--- Adds an argument to the command.
+---
+--- ```luau
+--- Command.new("program")
+--- 	:arg(
+---			Arg.new("foo")
+---				:short()
+---				:help("Prints 'foo' to stdout")
+--- 	)
+--- 	:arg(
+---			Arg.new("bar")
+---				:long()
+---				:short()
+---				:help("Prints 'bar' to stderr")
+--- 	)
+--- ```
 function Command.arg(self: Command, argument: Arg): Command
 	if not (argument._config.long or argument._config.short) then
+		if argument._config.required then
+			self._positionalArgRequired = true
+		end
+
 		if argument._config.index then
 			table.insert(self._positional, argument._config.index, argument)
 		else
@@ -218,6 +269,15 @@ function Command.arg(self: Command, argument: Arg): Command
 	return self
 end
 
+--- Adds multiple arguments to the command.
+---
+--- ```luau
+--- Command.new("program")
+--- 	:args({
+---			Arg.new("foo"):short():help("Prints 'foo' to stdout"),
+---			Arg.new("bar"):long():short():help("Prints 'bar' to stderr")
+---		})
+--- ```
 function Command.args(self: Command, arguments: { Arg }): Command
 	for _, arg in arguments do
 		self:arg(arg)
@@ -226,11 +286,57 @@ function Command.args(self: Command, arguments: { Arg }): Command
 	return self
 end
 
+--- Adds a subcommand to the command.
+---
+--- ```luau
+--- Command.new("program")
+--- 	:subcommand(
+--- 		Command.new("foo")
+---				:args({
+---					Arg.new("hello"):short()
+---					Arg.new("world")
+---				})
+--- 		)
+--- 	:subcommand(
+--- 		Command.new("bar")
+---				:args({
+---					Arg.new("foobar"):short(),
+---					Arg.new("barfoo")
+---				})
+--- 		)
+--- ```
 function Command.subcommand(self: Command, command: Command): Command
 	self._config.subcommands[command._config.name] = command
+	command._parent = self
+
+	for id, arg in self._globals do
+		if not command._config.args[id] then
+			command:arg(arg)
+		end
+	end
+
 	return self
 end
 
+--- Adds multiple subcommands to the command.
+---
+--- ```luau
+--- Command.new("program")
+--- 	:subcommands({
+--- 		Command.new("foo")
+---				:arg(
+---					Arg.new("foo"):short():help("Prints 'foo' to stdout"),
+---				)
+---				:arg(
+---					Arg.new("bar"):long():short():help("Prints 'bar' to stderr")
+---				)
+--- 		Command.new("bar")
+---				:args({
+---					Arg.new("foobar"):short(),
+---					Arg.new("barfoo")
+---				})
+--- 		})
+--- ```
 function Command.subcommands(self: Command, commands: { Command }): Command
 	for _, command in commands do
 		self:subcommand(command)
@@ -239,16 +345,25 @@ function Command.subcommands(self: Command, commands: { Command }): Command
 	return self
 end
 
+--- If no subcommand is present at runtime, error and exit gracefully.
+--- @param self Command
+--- @param required boolean -- defaults to `true`
 function Command.subcommandRequired(self: Command, required: boolean?)
 	self._config.subcommandRequired = required ~= false
 	return self
 end
 
+--- Sets an alias for this subcommand.
+---
+--- This allows the command to be accessed by either the original name, or the given alias.
 function Command.alias(self: Command, name: string): Command
 	table.insert(self._aliases, name)
 	return self
 end
 
+--- Sets multiple aliases for this subcommand.
+---
+--- This allows the command to be accessed by either the original name, or one of the given aliases.
 function Command.aliases(self: Command, names: { string }): Command
 	for _, name in names do
 		self:alias(name)
@@ -257,29 +372,37 @@ function Command.aliases(self: Command, names: { string }): Command
 	return self
 end
 
-function Command.shortAlias(self: Command, name: string): Command
-	table.insert(self._shortAliases, name)
-	return self
-end
-
-function Command.shortAliases(self: Command, names: { string }): Command
-	for _, name in names do
-		self:shortAlias(name)
-	end
-
+--- Exit gracefully and print help information if no arguments are present.
+---
+--- :::tip This is behavior is enabled by default.:::
+---
+--- :::note Subcommands count as arguments.:::
+---
+--- @param self Command
+--- @param enabled boolean? -- defaults to `true`
+function Command.argRequiredElseHelp(self: Command, enabled: boolean?)
+	self._config.argRequiredElseHelp = enabled ~= false
 	return self
 end
 
 -- TODO: line wrap
+--- Sets the maximum width for help messages.
+---
+---	:::note
+--- This is not fully implemented yet. Currently, when help message width is greater than this value,
+--- the help message will be displayed in an expanded format but will not wrap any text.
+--- :::
 function Command.termWidth(self: Command, width: number): Command
 	self._config.termWidth = width
 	return self
 end
 
+--- Get the name of the command.
 function Command.getName(self: Command): string
 	return self._config.name
 end
 
+--- Returns version information formatted for the version message.
 function Command.renderVersion(self: Command): string
 	if self._config.version then
 		return `{self:getName()} {self._config.version}\n`
@@ -288,6 +411,7 @@ function Command.renderVersion(self: Command): string
 	return ""
 end
 
+--- Prints version information to stdout.
 function Command.printVersion(self: Command)
 	stdio.write(self:renderVersion())
 end
@@ -308,6 +432,11 @@ local function formatArgUsage(arg: Arg)
 	return line
 end
 
+--- Returns usage information formatted for a help message.
+---
+--- When `isRenderHelp` is true, prints more descriptive information.
+---
+--- :::warning This function is likely to change in the future to avoid using a boolean flag.:::
 function Command.renderUsage(self: Command, isRenderHelp: boolean?)
 	local out = Buffer.new()
 
@@ -347,6 +476,7 @@ function Command.renderUsage(self: Command, isRenderHelp: boolean?)
 	return tostring(out)
 end
 
+--- Prints usage information to stdout.
 function Command.printUsage(self: Command)
 	stdio.write(self:renderUsage())
 end
@@ -408,14 +538,16 @@ function Command._justify(
 	for _, line in lines do
 		if #line[1] + #line[2] > self._config.termWidth then
 			expanded = true
-			break
 		end
 	end
 
 	if expanded then
 		for i, line in lines do
 			out:print(`{TAB}{color.green(line[1])}`)
-			out:print(`{string.rep(TAB, 2)}{line[2]}`)
+			out:print(
+				string.rep(TAB, 2)
+					.. term.wrap(line[2], self._config.termWidth, TAB_WIDTH * 2)
+			)
 
 			if i < #lines then
 				out:print()
@@ -431,6 +563,7 @@ function Command._justify(
 	return tostring(out)
 end
 
+--- Returns help information formatted for a help message.
 function Command.renderHelp(self: Command): string
 	local out = Buffer.new()
 
@@ -489,6 +622,7 @@ function Command._createBuiltins(self: Command)
 		self:subcommand(
 			Command.new("help")
 				:arg(Arg.new("subcommand"))
+				:argRequiredElseHelp(false)
 				:about(
 					"Print this information or the help of the given subcommand"
 				)
@@ -517,6 +651,7 @@ function Command._createBuiltins(self: Command)
 	end
 end
 
+--- Prints help information to stdout.
 function Command.printHelp(self: Command)
 	stdio.write(self:renderHelp())
 end
@@ -539,11 +674,16 @@ end
 
 function Command._buildMatches(
 	self: Command,
-	input: { string }
+	input: { string },
+	parent: ArgMatches?
 ): Result<ArgMatches>
 	self:_createBuiltins()
 
 	local matches = ArgMatches.new(self)
+
+	if parent then
+		matches:_setParent(parent)
+	end
 
 	-- populate any arguments with env vars
 	local envMatched
@@ -558,7 +698,10 @@ function Command._buildMatches(
 	if
 		not envMatched
 		and #input <= 0
-		and (#self._positional > 0 or next(self._config.subcommands))
+		and ((#self._positional > 0 and self._positionalArgRequired) or next(
+			self._config.subcommands
+		))
+		and self._config.argRequiredElseHelp
 	then
 		return self:_err(Error.DisplayOnMissingArgumentOrSubcommand)
 	end
@@ -684,11 +827,9 @@ function Command._buildMatches(
 					table.remove(subInput, 1)
 				end
 
-				return subcommand
-					:_buildMatches(subInput)
-					:andThen(function(subMatches)
-						return Ok(matches:_addSubcommand(subMatches))
-					end)
+				return subcommand:_buildMatches(subInput, matches):map(function()
+					return matches
+				end)
 			end
 
 			if next(self._config.subcommands) and #self._positional == 0 then
@@ -716,31 +857,35 @@ function Command._buildMatches(
 		)
 	end
 
+	-- check for required subcommands
+	if next(self._required) == nil and self._config.subcommandRequired then
+		return self:_err(Error.NoSubcommand, self._config.name)
+	end
+
 	-- check for required arguments
-	return Ok(matches):andThen(function(match: ArgMatches)
-		if next(self._required) == nil and self._config.subcommandRequired then
-			return self:_err(Error.NoSubcommand, self._config.name)
+	local missing = {}
+
+	for name, arg in self._required do
+		if not matches:containsId(name) then
+			table.insert(missing, formatArgUsage(arg))
 		end
+	end
 
-		local missing = {}
+	if #missing > 0 then
+		return self:_err(
+			Error.NoValue,
+			`\n{TAB}{table.concat(missing, `\n{TAB}`)}`
+		)
+	end
 
-		for name, arg in self._required do
-			if not match:containsId(name) then
-				table.insert(missing, formatArgUsage(arg))
-			end
-		end
-
-		if #missing > 0 then
-			return self:_err(
-				Error.NoValue,
-				`\n{TAB}{table.concat(missing, `\n{TAB}`)}`
-			)
-		end
-
-		return Ok(match)
-	end)
+	return Ok(matches)
 end
 
+--- Processes the specified arguments, returning a `Result`.
+---
+--- This method will not exit when `--help` or `--version` are used. It will return an `Error`,
+--- where `id` is either `Error.DisplayHelp` or `Error.DisplayVersion`. You must call `Command:exit`
+--- yourself if you would like these commands to work as expected.
 function Command.tryGetMatchesFrom(
 	self: Command,
 	input: { string }
@@ -779,6 +924,7 @@ function Command.tryGetMatchesFrom(
 		end)
 end
 
+--- Process the given arguments, exiting on failure.
 function Command.getMatchesFrom(self: Command, input: { string }): ArgMatches
 	return self:tryGetMatchesFrom(input):match({
 		Ok = function(matches: ArgMatches)
@@ -790,15 +936,18 @@ function Command.getMatchesFrom(self: Command, input: { string }): ArgMatches
 	})
 end
 
+--- Calls `tryGetMatchesFrom` on `process.args`
 function Command.tryGetMatches(self: Command): Result<ArgMatches>
 	return self:tryGetMatchesFrom(process.args)
 end
 
+--- Calls `getMatches` on `process.args`
 function Command.getMatches(self: Command): ArgMatches
 	return self:getMatchesFrom(process.args)
 end
 
-function Command.exit(self: Command)
+--- Prints any error information and calls `process.exit`.
+function Command.exit(self: Command, code: number?)
 	if self._error then
 		if self._error:is(Error.DisplayHelp, Error.DisplayVersion) then
 			stdio.write(tostring(self._error))
@@ -808,6 +957,8 @@ function Command.exit(self: Command)
 			return process.exit(1)
 		end
 	end
+
+	return process.exit(code)
 end
 
 return Command

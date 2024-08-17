@@ -291,6 +291,8 @@ end
 --- do not affect the runtime.
 function Iter.intoResult<K, V, E>(self: Iter<K, Result<V, E>>): Result<{ [K]: V }, E>
 	local res = self:tryFold({}, function(x, key, value: Result<V, E>)
+		assert(Result.is(value), `Expected Result, got {typeof(value)}`)
+
 		if value:isOk() then
 			x[key] = value:unwrap()
 			return x

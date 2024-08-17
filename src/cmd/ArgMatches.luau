@@ -23,6 +23,7 @@ export type ArgMatches = typeof(setmetatable(
 		_app: Command,
 		_args: { [string]: any },
 		_globals: { [string]: any },
+		_parent: ArgMatches?,
 		_subcommand: ArgMatches?,
 	},
 	ArgMatches
@@ -33,11 +34,12 @@ function ArgMatches.new(app: Command): ArgMatches
 		_app = app,
 		_args = {},
 		_globals = {},
+		_parent = nil,
 		_subcommand = nil,
 	}, ArgMatches)
 end
 
-function ArgMatches._add(self: ArgMatches, arg: Arg, value: any): ArgMatches
+function ArgMatches._add(self: ArgMatches, arg: Arg, _value: never): ArgMatches
 	assert(
 		arg._config.action:is(ArgAction.Count),
 		"[blam]\narg._config.argAction:is(ArgAction.Count)"
@@ -115,7 +117,8 @@ function ArgMatches._append(self: ArgMatches, arg: Arg, value: any): ArgMatches
 		self._args[arg._config.name] = {}
 	end
 
-	table.insert(self._args[arg._config.name], value)
+	-- TODO: multiple arguments
+	table.insert(self._args[arg._config.name], { value })
 
 	if arg._config.global then
 		self._globals[arg._config.name] = self._args[arg._config.name]
@@ -135,22 +138,25 @@ local processMap = {
 function ArgMatches._process(self: ArgMatches, arg: Arg, ...)
 	local processArgAction = processMap[arg._config.action]
 	assert(processArgAction ~= nil, "[blam]\nprocessArgAction ~= nil")
+
 	processArgAction(self, arg, ...)
+
+	if self._parent and arg._config.global then
+		processArgAction(self._parent, arg)
+	end
 end
 
-function ArgMatches._addSubcommand(
-	self: ArgMatches,
-	subcommand: ArgMatches
-): ArgMatches
-	for name, value in self._globals do
-		subcommand._globals[name] = value
+function ArgMatches._setParent(self: ArgMatches, parent: ArgMatches): ArgMatches
+	parent._subcommand = self
+	self._parent = parent
 
-		if subcommand._args[name] == nil then
-			subcommand._args[name] = value
+	for name, value in self._globals do
+		self._globals[name] = value
+
+		if self._args[name] == nil then
+			self._args[name] = value
 		end
 	end
-
-	self._subcommand = subcommand
 
 	return self
 end
@@ -158,20 +164,48 @@ end
 function ArgMatches._verifyActionType(
 	self: ArgMatches,
 	id: string,
-	action: ArgAction
-)
-	return self._app._config.args[id]._config.argAction == action
+	...: ArgAction
+): boolean
+	local arg = self._app._config.args[id]
+
+	if not arg then
+		return false
+	end
+
+	return self._app._config.args[id]._config.action:is(...)
 end
 
-function ArgMatches.getOne(self: ArgMatches, id: string): Option<string>
-	assert(
-		self:_verifyActionType(id, ArgAction.Set),
-		"[blam]\nself:_verifyActionType(id, ArgAction.Set)"
-	)
+function ArgMatches._assertActionType(
+	self: ArgMatches,
+	id: string,
+	...: ArgAction
+)
+	if not self:_verifyActionType(id, ...) then
+		assert(self._app._config.args[id], `Invalid Arg id '{id}'`)
 
+		local actionType = tostring(self._app._config.args[id]._config.action)
+
+		local message =
+			`\nUnexpected ArgAction for '{id}': {actionType}.\nExpected one of the following:$@`
+
+		for i = 1, select("#", ...) do
+			message =
+				string.gsub(message, "$@", "\n\t- " .. tostring(select(i, ...)))
+		end
+
+		message = string.gsub(message, "$@", "")
+
+		error(message)
+	end
+end
+
+--- Get the value of the specified `ArgAction.Set` argument.
+function ArgMatches.getOne(self: ArgMatches, id: string): Option<string>
+	self:_assertActionType(id, ArgAction.Set)
 	return Some(self._args[id])
 end
 
+--- Get the subcommand, if there is one. Returns an `Option`.
 function ArgMatches.getSubcommand(self: ArgMatches): Option<{
 	matches: ArgMatches,
 	name: string,
@@ -184,34 +218,24 @@ function ArgMatches.getSubcommand(self: ArgMatches): Option<{
 	end)
 end
 
+--- Get the value of the specified `ArgAction.Count` argument.
 function ArgMatches.getCount(self: ArgMatches, id: string): number
-	assert(
-		self:_verifyActionType(id, ArgAction.Count),
-		"[blam]\nself:_verifyActionType(id, ArgAction.Count)"
-	)
-
+	self:_assertActionType(id, ArgAction.Count)
 	return self._args[id]
 end
 
+--- Get the value of the specified `ArgAction.SetTrue` or `ArgAction.SetFalse` argument.
 function ArgMatches.getFlag(self: ArgMatches, id: string): boolean
-	assert(
-		self:_verifyActionType(id, ArgAction.SetTrue)
-			or self:_verifyActionType(id, ArgAction.SetFalse),
-		"[blam]\n\t\tself:_verifyActionType(id, ArgAction.SetTrue)"
-			.. "\n\t\t\tor self:_verifyActionType(id, ArgAction.SetFalse)\n"
-	)
-
+	self:_assertActionType(id, ArgAction.SetTrue, ArgAction.SetFalse)
 	return self._args[id] == true
 end
 
+--- Get all of the values for the specified `ArgAction.Append` argument.
 function ArgMatches.getMany(self: ArgMatches, id: string): Option<Iter<string>>
-	assert(
-		self:_verifyActionType(id, ArgAction.Append),
-		"[blam]\nself:_verifyActionType(id, ArgAction.Append)"
-	)
+	self:_assertActionType(id, ArgAction.Append)
 
 	return Some(self._args[id]):map(function(args)
-		local result = Iter.new(args)
+		local matches = Iter.new(args)
 			:fold({}, function(result, _, occurrence: { string })
 				for _, value in occurrence do
 					table.insert(result, value)
@@ -220,18 +244,23 @@ function ArgMatches.getMany(self: ArgMatches, id: string): Option<Iter<string>>
 				return result
 			end)
 
-		return Iter.new(result)
+		return Iter.new(matches)
 	end)
 end
 
+--- Get the values of the specified `ArgAction.Append` argument.
+---
+--- This is different from `getMany` in that it will group each occurrence of the argument into its own array.
+---
+--- :::tip
+--- This is method isn't very useful yet because we do not currently support delimiters or termination
+--- for `ArgAction.Append`.
+--- :::
 function ArgMatches.getOccurrences(
 	self: ArgMatches,
 	id: string
 ): Option<Iter<Iter<string>>>
-	assert(
-		self:_verifyActionType(id, ArgAction.Append),
-		"[blam]\nself:_verifyActionType(id, ArgAction.Append)"
-	)
+	self:_assertActionType(id, ArgAction.Append)
 
 	return Some(self._args[id]):map(function(args): any
 		return Iter.new(args):map(function(_, occurrence)
@@ -240,14 +269,17 @@ function ArgMatches.getOccurrences(
 	end)
 end
 
+--- Check whether or not the given argument exists.
 function ArgMatches.containsId(self: ArgMatches, id: string): boolean
-	return (self._args[id] :: any) ~= nil
+	return self._args[id] ~= nil
 end
 
+--- Returns an iterator over all of the matched arguments.
 function ArgMatches.ids(self: ArgMatches): MapIter<unknown>
 	return Iter.new(self._args)
 end
 
+--- Check whether or not any arguments were matched.
 function ArgMatches.argsPresent(self: ArgMatches)
 	return next(self._args) ~= nil
 end

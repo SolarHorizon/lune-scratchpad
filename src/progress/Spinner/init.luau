@@ -16,12 +16,14 @@ type SpinnerImpl = {
 	new: (options: SpinnerOptions?) -> Spinner,
 	start: (Spinner) -> (),
 	stop: (Spinner) -> (),
+	complete: (Spinner, string) -> (),
+	fail: (Spinner, string) -> (),
 }
 
 type Spinner = typeof(setmetatable(
 	{} :: {
 		_frame: number,
-		_spinning: boolean,
+		spinning: boolean,
 		_thread: thread?,
 		animation: animations.SpinnerAnimation,
 		color: stdio.Color,
@@ -80,12 +82,25 @@ function Spinner:start()
 end
 
 function Spinner:stop()
-	if self._thread then
-		task.cancel(self._thread)
+	if not self._thread then
+		return
 	end
 
-	self._thread = nil
+	task.cancel(self._thread)
 	term.clearLine()
+
+	self._thread = nil
+end
+
+-- these are soooo stupid but i'm so tired
+function Spinner:complete(text: string)
+	self:stop()
+	print(`{term.color.green("✔")} {text}`)
+end
+
+function Spinner:fail(text: string)
+	self:stop()
+	print(`{term.color.red("✘")} {text}`)
 end
 
 return {

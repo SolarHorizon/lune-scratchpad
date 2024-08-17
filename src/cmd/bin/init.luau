@@ -2,7 +2,7 @@ local cmd = require("@lib/cmd")
 
 type ArgMatches = cmd.ArgMatches
 
-local Command, Arg, Action = cmd.Command, cmd.Arg, cmd.Action
+local Command, Arg, Action = cmd.Command, cmd.Arg, cmd.ArgAction
 
 local cli = Command.new("test")
 	:version("v0.1.0")

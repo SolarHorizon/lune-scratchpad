@@ -303,15 +303,29 @@ end
 do
 	local process = require("@lune/process")
 
-	type SpawnResult = process.SpawnResult
+	type SpawnResult = Result<process.SpawnResult, process.SpawnResult>
 
 	--- @within Result
 	--- @tag Lune
 	--- Takes a `ProcessSpawnResult` and turns it into a `Result`. If it fails, returns an `Err` containing the
 	--- `ProcessSpawnResult`. If it succeeds, returns `Ok` containing the `ProcessSpawnResult`.
 	function Result.fromSpawnResult(
-		spawnResult: SpawnResult
-	): Result<SpawnResult, SpawnResult>
+		spawnResult: process.SpawnResult
+	): SpawnResult
+		if spawnResult.ok then
+			return Ok(spawnResult)
+		end
+
+		return Err(spawnResult)
+	end
+
+	--- @within Result
+	--- @tag Lune
+	--- Spawns a process using `process.spawn` and turns the `ProcessSpawnResult` into a `Result`. If it fails, returns an `Err` containing the
+	--- `ProcessSpawnResult`. If it succeeds, returns `Ok` containing the `ProcessSpawnResult`.
+	function Result.fromProcess(program, params, options): SpawnResult
+		local spawnResult = process.spawn(program, params, options)
+
 		if spawnResult.ok then
 			return Ok(spawnResult)
 		end

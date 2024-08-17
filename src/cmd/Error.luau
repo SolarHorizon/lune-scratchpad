@@ -25,14 +25,14 @@ local function newId(str: string)
 end
 
 local function err(id: string | Error, value: any?, ...): Error
-	local err: string = value :: any
+	local msg: string = value :: any
 
-	if not err and Error._is(id) then
-		err = (id :: Error)._error
+	if not msg and Error._is(id) then
+		msg = (id :: Error)._error
 	end
 
 	return setmetatable({
-		_error = err or "",
+		_error = msg or "",
 		id = if Error._is(id) then (id :: Error).id else newId(id :: string),
 		_context = { ... },
 	}, Error)

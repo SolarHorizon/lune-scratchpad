@@ -11,6 +11,22 @@ Arg.__index = Arg
 
 type ArgImpl = typeof(Arg)
 
+--- @interface ArgConfig
+--- .aliases { string }?
+--- .action ArgAction?
+--- .env string?
+--- .global boolean?
+--- .help string?
+--- .hideEnvValues boolean?
+--- .index number?
+--- .long (string | boolean)?
+--- .name string
+--- .numArgs number?
+--- .required boolean?
+--- .short (string | boolean)?
+--- .shortAliases { string }?
+--- .valueName string?
+
 type ArgConfig<Action, ValueName, ShortLongType, Aliases> = {
 	aliases: Aliases,
 	action: Action,
@@ -37,6 +53,14 @@ export type Arg = typeof(setmetatable(
 	{} :: ArgImpl
 ))
 
+--- Construct a new `Arg` with a unique name.
+---
+--- `name` is used as an identifier for the argument.
+---
+--- :::note
+--- In the case of arguments that take values and positional arguments, the name will also
+--- be displayed when the user prints usage or help information for the program.
+--- :::
 function Arg.new(name: string): Arg
 	return setmetatable({
 		_config = {
@@ -55,6 +79,7 @@ local deserialize = {
 	end,
 }
 
+--- Construct a new `Arg` from a table
 function Arg.from(config: Config): Arg
 	local arg = Arg.new(config.name)
 
@@ -74,6 +99,17 @@ function Arg.from(config: Config): Arg
 	return arg
 end
 
+--- Sets a short version of the argument.
+---
+--- ## Example
+---
+--- Calling `short` without any arguments is the same as calling `short` with the first letter
+--- of the `Arg`'s name.
+--- ```luau
+--- -- these are the same
+--- Arg.new("foo"):short()
+--- Arg.new("foo"):short("f")
+--- ```
 function Arg.short(self: Arg, short: (string | boolean)?): Arg
 	assert(
 		self._config.index == nil,
@@ -96,6 +132,16 @@ function Arg.short(self: Arg, short: (string | boolean)?): Arg
 	return self
 end
 
+--- Sets a long version of the argument.
+---
+--- ## Example
+---
+--- Calling `long` without any arguments is the same as calling `long` with the `Arg`'s name.
+--- ```luau
+--- -- these are the same
+--- Arg.new("foo"):long()
+--- Arg.new("foo"):long("foo")
+--- ```
 function Arg.long(self: Arg, long: (string | boolean)?): Arg
 	assert(
 		self._config.index == nil,
@@ -112,6 +158,44 @@ function Arg.long(self: Arg, long: (string | boolean)?): Arg
 	return self
 end
 
+--- Sets the index of a positional argument.
+--- By default, when creating an argument without `short` or `long`, the
+--- `index` will be incremented sequentially based on any previous positional
+--- arguments.
+---
+--- :::tip Positional arguments are just arguments without a `short` or `long`:::
+---
+---	## Example
+---
+---	In this example, you'd use the command like so:
+---	```
+---	program <bar> <foo>
+--- ```
+---
+---	```luau
+--- Command.new("program")
+--- 	:arg(
+---			Arg.new("bar")
+--- 	)
+--- 	:arg(
+---			Arg.new("foo")
+--- 	)
+---	```
+---
+---	Whereas in this example, the command would be:
+--- ```
+---	program <foo> <bar>
+--- ```
+---
+---	```luau
+--- Command.new("program")
+--- 	:arg(
+---			Arg.new("bar"):index(2)
+--- 	)
+--- 	:arg(
+---			Arg.new("foo")
+--- 	)
+---	```
 function Arg.index(self: Arg, index: number): Arg
 	assert(
 		self._config.short == nil and self._config.long == nil,
@@ -122,6 +206,7 @@ function Arg.index(self: Arg, index: number): Arg
 	return self
 end
 
+--- Sets the `ArgAction` of an argument.
 function Arg.action(self: Arg, argAction: ArgAction): Arg
 	assert(
 		ArgAction.isA(argAction),
@@ -131,47 +216,60 @@ function Arg.action(self: Arg, argAction: ArgAction): Arg
 	return self
 end
 
+--- Sets the `valueName` of an argument to be displayed in help information.
 function Arg.valueName(self: Arg, name: string): Arg
 	self._config.valueName = name
 	return self
 end
 
+--- Sets the `help` of an argument to be displayed in help information.
 function Arg.help(self: Arg, description: string): Arg
 	self._config.help = description
 	return self
 end
 
+--- Make this argument required.
+--- :::warning Global arguments cannot be required.:::
 function Arg.required(self: Arg, required: boolean?): Arg
+	assert(not self._config.global, "Global arguments cannot be required.")
 	self._config.required = required ~= false
 	return self
 end
 
+--- Make this argument global. It will be propagated to any subcommands.
 function Arg.global(self: Arg, global: boolean?): Arg
+	assert(not self._config.required, "Global arguments cannot be required.")
 	self._config.global = global ~= false
 	return self
 end
 
+--- Read from the given environment variable when the argument isn't present.
 function Arg.env(self: Arg, name: string): Arg
 	self._config.env = name
 	return self
 end
 
--- not implemented
+--- Not implemented - we do not print values passed to arguments anywhere. You
+--- should still use this method for any sensitive data you're passing (like api keys)
+--- through environment variables incase this changes.
 function Arg.hideEnvValues(self: Arg, hide: boolean?): Arg
 	self._config.hideEnvValues = hide ~= false
 	return self
 end
 
+--- Sets an `long` alias for this argument
 function Arg.alias(self: Arg, name: string): Arg
 	table.insert(self._config.aliases, name)
 	return self
 end
 
+--- Sets a `short` alias for this argument
 function Arg.shortAlias(self: Arg, name: string): Arg
 	table.insert(self._config.shortAliases, name)
 	return self
 end
 
+--- Sets multiple `long` aliases for this argument
 function Arg.aliases(self: Arg, names: { string }): Arg
 	for _, name in names do
 		table.insert(self._config.aliases, name)
@@ -180,7 +278,16 @@ function Arg.aliases(self: Arg, names: { string }): Arg
 	return self
 end
 
--- not implemented
+--- Sets multiple `short` aliases for this argument
+function Arg.shortAliases(self: Arg, names: { string }): Arg
+	for _, name in names do
+		table.insert(self._config.shortAliases, name)
+	end
+
+	return self
+end
+
+--- Not yet implemented
 function Arg.numArgs(self: Arg, number: number): Arg
 	self._config.numArgs = number
 	return self
