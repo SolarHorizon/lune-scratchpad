@@ -26,6 +26,8 @@ local function makeDirAll(path: string)
 
 		dir = nextDir
 	end
+
+	return path
 end
 
 return makeDirAll
