@@ -14,8 +14,12 @@ type Matcher = (roblox.Instance) -> boolean
 
 local function isA(instance: roblox.Instance, classes: { string })
 	for _, class in classes do
-		if instance:IsA(class) then
-			return true
+		local success, isA = pcall(function()
+			return instance:IsA(class)
+		end)
+
+		if success and isA then
+			return isA
 		end
 	end
 
