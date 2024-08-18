@@ -15,7 +15,7 @@
 
 local Opener = require("../Opener")
 
---Opener.new():openFile("./test.rbxl"):unwrap():run():inspectErr(function(e)
-Opener.new():openPlace(5338844978, 15472100873):run():inspectErr(function(e)
+Opener.new():openFile("./test.rbxl"):unwrap():run():inspectErr(function(e)
+	--Opener.new():openPlace(5338844978, 15472100873):run():inspectErr(function(e)
 	print(e.stderr)
 end)

@@ -69,8 +69,6 @@ function Opener.openFile(
 	self: RobloxStudioOpener,
 	file: string
 ): Result<RobloxStudioOpener>
-	file = efs.normalizePath(file)
-
 	return efs.canonicalize(file):map(function(path)
 		return self:withArg("task", Task.EditFile)
 			:withArg("localPlaceFile", path)
