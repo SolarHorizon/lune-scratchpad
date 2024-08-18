@@ -19,7 +19,7 @@ end
 
 local AssetVersions = {
 	assetVersions = gt.array(types.AssetVersion),
-	nextPageToken = gt.string(),
+	nextPageToken = gt.opt(gt.string()),
 }
 
 export type AssetVersions = typeof(AssetVersions)
