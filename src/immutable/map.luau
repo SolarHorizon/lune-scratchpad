@@ -5,12 +5,12 @@ local function map<T, U, V, W>(
 		key: T,
 		table: { [T]: U }
 	) -> (W?, V?)
-)
+): { [V]: W }
 	local mapped = {}
 
 	for k, v in t do
 		local value, key = fn(v, k, t)
-		mapped[key or k] = value
+		mapped[key or (k :: any) :: V] = value :: W
 	end
 
 	return mapped
