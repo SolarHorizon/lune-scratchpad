@@ -110,17 +110,17 @@ local function install(options: Options?): Result<unknown, string>
 		end)
 
 	if opts.pretty then
-		if spinner then
-			spinner:stop()
-		end
-
 		result:match({
-			Ok = function(): nil
-				return print("Successfully installed Wally packages")
+			Ok = function()
+				if spinner then
+					spinner:complete("Successfully installed Wally packages")
+				end
 			end,
-			Err = function(err): nil
-				term.clearLine()
-				return term.errPrint(tostring(err))
+			Err = function(err)
+				if spinner then
+					spinner:fail("Failed to install Wally packages")
+				end
+				term.errPrint(tostring(err))
 			end,
 		})
 	end
