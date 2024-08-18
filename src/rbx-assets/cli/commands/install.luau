@@ -62,8 +62,6 @@ local function getPlacesFrom(
 		end)
 end
 
-local dbg = require("@lib/dbg")
-
 local function install(matches, spinner)
 	local places = matches:getMany("places")
 	local projectPath = matches:getOne("project-path"):unwrapOr(process.cwd)
@@ -83,7 +81,7 @@ local function install(matches, spinner)
 
 					spinner.text = "Fetching places"
 
-					return getPlacesFrom(dbg(places), lockfile)
+					return getPlacesFrom(places, lockfile)
 				end)
 				:unwrapOr(Ok(lockfile))
 				:andThen(function(selection)

@@ -137,7 +137,7 @@ local function getAssetsFromLockfile(
 end
 
 local function buildTree(root: string, tree: InstanceTree)
-	if not fs.isDir(root) then
+	if fs.isDir(root) then
 		fs.removeDir(root)
 	end
 
