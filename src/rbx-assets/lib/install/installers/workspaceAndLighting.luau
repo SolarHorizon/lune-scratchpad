@@ -6,8 +6,9 @@ type Options = {
 	exclude: instance.FilterOptions,
 }
 
-local function workspaceAndLighting(game: roblox.DataModel, options: Options)
-	local filter = instance.createFilter(options.exclude)
+local function workspaceAndLighting(game: roblox.DataModel, options: Options?)
+	local filter =
+		instance.createFilter(if options then options.exclude else nil)
 
 	return {
 		Workspace = filter(game:GetService("Workspace")),

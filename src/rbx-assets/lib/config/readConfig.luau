@@ -31,7 +31,6 @@ local DEFAULT_INSTALLER = {
 
 local PLACE_DEFAULT = {
 	output = "./assets",
-	installer = DEFAULT_INSTALLER,
 }
 
 local FILE_FORMATS: { [string]: any } = {
@@ -108,12 +107,12 @@ local function readConfig(projectPath: string?): Result<Config>
 			end)
 		end)
 		:map(function(config: RawConfig)
-			return merge({
-				defaultInstaller = DEFAULT_INSTALLER,
+			return {
+				defaultInstaller = config.defaultInstaller or DEFAULT_INSTALLER,
 				places = map(config.places, function(place)
 					return createPlaceConfig(place, config.defaultInstaller)
 				end),
-			}, config)
+			}
 		end)
 		:andThen(function(config: Config)
 			local usedOutputs = {}

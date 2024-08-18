@@ -11,7 +11,7 @@ type ArgMatches = cmd.ArgMatches
 
 local function initialize(matches: ArgMatches, _spinner)
 	local projectPath = matches:getOne("project-path"):unwrapOr(process.cwd)
-	local edit = matches:getOne("edit"):isSome()
+	local edit = matches:getFlag("edit")
 
 	local existing = lib.readConfig(projectPath)
 
