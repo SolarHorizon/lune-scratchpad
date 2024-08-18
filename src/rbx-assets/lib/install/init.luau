@@ -5,6 +5,7 @@ local Future = require("@lib/Future")
 local Iter = require("@lib/Iter")
 local Result = require("@lib/Result")
 local batchGetAssets = require("@lib/rbx-api/assets/batchGetAssets")
+local efs = require("@lib/efs")
 local immutable = require("@lib/immutable")
 local withCookie = require("@lib/rbx-api/withCookie")
 
@@ -141,7 +142,7 @@ local function buildTree(root: string, tree: InstanceTree)
 		fs.removeDir(root)
 	end
 
-	fs.writeDir(root)
+	efs.makeDirAll(root)
 
 	if typeof(tree) ~= "table" then
 		fs.writeFile(`{root}.rbxm`, roblox.serializeModel({ tree }))
