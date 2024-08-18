@@ -5,7 +5,7 @@ install package name:
 
 # Build a binary package
 build package:
-	lune run build {{package}} linux-x86_64
+	lune run build {{package}}
 
 # Run a binary package
 @run package *args:
