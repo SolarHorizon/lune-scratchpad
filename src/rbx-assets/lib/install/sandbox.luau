@@ -8,6 +8,7 @@ local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 local task = require("@lune/task")
 
+local greentea = require("./std/greentea")
 local installer = require("./std/installer")
 local instance = require("./std/instance")
 local text = require("./std/text")
@@ -117,8 +118,9 @@ local function sandbox(filePath: string): Result<Installer>
 		["@lune/regex"] = regex,
 		["@lune/task"] = task,
 
-		-- luau type system doesn't like PROG_NAME
-		[`@{PROG_NAME}/installer`] = installer :: any,
+		-- luau type system doesn't like PROG_NAME, so i have to cast to any
+		[`@{PROG_NAME}/greentea`] = greentea :: any,
+		[`@{PROG_NAME}/installer`] = installer,
 		[`@{PROG_NAME}/instance`] = instance,
 		[`@{PROG_NAME}/text`] = text,
 	}

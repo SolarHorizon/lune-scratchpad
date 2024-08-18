@@ -1,5 +1,6 @@
 local roblox = require("@lune/roblox")
 
+local gt = require("../std/greentea")
 local instance = require("../std/instance")
 local text = require("../std/text")
 
@@ -9,9 +10,16 @@ type InstanceTree = {
 	[string]: Instance | InstanceTree,
 }
 
-type CombineBehavior = "error" | "rename"
+local Options = gt.build({
+	roots = gt.array(gt.string()),
+	recursive = gt.opt(gt.boolean()),
+	combineBehavior = gt.opt(
+		gt.oneOf(gt.literal("error"), gt.literal("rename"))
+	),
+	exclude = gt.opt(gt.any()),
+})
 
-local function combine(behavior: CombineBehavior?, ...: InstanceTree)
+local function combine(behavior: string?, ...: InstanceTree)
 	local new = {}
 
 	local unique = text.createUnique()
@@ -33,19 +41,12 @@ local function combine(behavior: CombineBehavior?, ...: InstanceTree)
 	return new
 end
 
-local function foldersIn(
-	game: roblox.Instance,
-	options: {
-		roots: { [string]: { string } },
-		recursive: boolean?,
-		exclude: instance.FilterOptions?,
-		combineBehavior: CombineBehavior?,
-	}
-)
-	assert(
-		typeof(options.roots) == "table",
-		`Expected 'roots' to be an array of glob paths`
-	)
+local function foldersIn(game: roblox.Instance, options: typeof(Options:type()))
+	local success, err = Options:matches(options)
+
+	if not success then
+		error(err:formatErr())
+	end
 
 	local function collectFolders(
 		root: roblox.Instance,
@@ -80,26 +81,20 @@ local function foldersIn(
 		return folders
 	end
 
-	local children = {}
+	local root = {}
 
-	for name, paths in options.roots do
-		local root = {}
+	for _, path in options.roots do
+		local tree = collectFolders(instance.find(game, path))
 
-		for _, path in paths do
-			local tree = collectFolders(instance.find(game, path))
-
-			if typeof(tree) ~= "table" then
-				warn("Non-folder instance at root", tree.ClassName, tree.Name)
-				continue
-			end
-
-			root = combine(options.combineBehavior, root, tree)
+		if typeof(tree) ~= "table" then
+			warn("Non-folder instance at root", tree.ClassName, tree.Name)
+			continue
 		end
 
-		children[name] = root
+		root = combine(options.combineBehavior, root, tree)
 	end
 
-	return children
+	return root
 end
 
 return foldersIn

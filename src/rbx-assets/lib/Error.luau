@@ -1,4 +1,7 @@
 local Error = require("@lib/Error")
+local constants = require("./constants")
+
+local PROG_NAME = constants.PROG_NAME
 
 export type Error = Error.Error
 
@@ -45,9 +48,13 @@ return {
 	ConfigWriteError = Error("ConfigWriteError", "Failed to write to $1:\n$2"),
 	NoConfig = Error(
 		"NoConfig",
-		"rbx-assets requires a config, but no $1 file was found"
+		`{PROG_NAME} requires a config, but no $1 file was found`
 	),
 	InvalidConfig = Error("InvalidConfig", "Invalid config\n$1"),
+	ConflictingOutputConfig = Error(
+		"ConflictingOutputConfig",
+		"Output for '$1' conflicts with '$2'. Output must be unique."
+	),
 
 	UnrecognizedPlace = Error(
 		"InvalidPlace",

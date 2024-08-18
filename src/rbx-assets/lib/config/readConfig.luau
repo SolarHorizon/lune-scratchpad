@@ -7,6 +7,7 @@ local efs = require("@lib/efs")
 local immutable = require("@lib/immutable")
 
 local Error = require("../Error")
+local constants = require("../constants")
 local types = require("../types")
 
 type Error = Error.Error
@@ -17,21 +18,20 @@ type InstallerConfig = types.InstallerConfig
 type RawConfig = types.RawConfig
 type RawPlaceConfig = types.RawPlaceConfig
 
+local Ok = Result.Ok
 local Err = Result.Err
 local map = immutable.map
 local merge = immutable.merge
 local Config = types.Config
 local RawConfig = types.RawConfig
 
-local PLACE_DEFAULT = {
-	output = "./assets",
-	installer = {
-		script = "default",
-	},
-}
-
 local DEFAULT_INSTALLER = {
 	script = "@workspaceAndLighting",
+}
+
+local PLACE_DEFAULT = {
+	output = "./assets",
+	installer = DEFAULT_INSTALLER,
 }
 
 local FILE_FORMATS: { [string]: any } = {
@@ -41,7 +41,7 @@ local FILE_FORMATS: { [string]: any } = {
 	json = "json",
 }
 
-local FILE = "rbx-assets"
+local FILE = constants.PROG_NAME
 
 local function createInstallerConfig(
 	value: (string | InstallerConfig)?,
@@ -108,11 +108,30 @@ local function readConfig(projectPath: string?): Result<Config>
 			end)
 		end)
 		:map(function(config: RawConfig)
-			return merge(config, {
+			return merge({
+				defaultInstaller = DEFAULT_INSTALLER,
 				places = map(config.places, function(place)
 					return createPlaceConfig(place, config.defaultInstaller)
 				end),
-			})
+			}, config)
+		end)
+		:andThen(function(config: Config)
+			local usedOutputs = {}
+
+			for name, place in config.places do
+				if usedOutputs[place.output] then
+					return Err(
+						Error.ConflictingOutputConfig(
+							name,
+							usedOutputs[place.output]
+						)
+					)
+				end
+
+				usedOutputs[place.output] = name
+			end
+
+			return Ok(config)
 		end)
 		:andThen(function(config)
 			return Result.fromGtType(Config, config):mapErr(function(err)

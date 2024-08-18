@@ -62,6 +62,8 @@ local function getPlacesFrom(
 		end)
 end
 
+local dbg = require("@lib/dbg")
+
 local function install(matches, spinner)
 	local places = matches:getMany("places")
 	local projectPath = matches:getOne("project-path"):unwrapOr(process.cwd)
@@ -71,18 +73,17 @@ local function install(matches, spinner)
 		return roblox.getAuthCookie() :: string
 	end)
 
-	spinner.text = "Generating lockfile"
-
-	if not spinner.spinning then
-		spinner:start()
-	end
-
 	return getLockfile(apiKey, projectPath, places):andThen(
 		function(lockfile: Lockfile)
 			return places
 				:map(function(places)
-					spinner.text = "Downloading places"
-					return getPlacesFrom(places, lockfile)
+					if not spinner.spinning then
+						spinner:start()
+					end
+
+					spinner.text = "Fetching places"
+
+					return getPlacesFrom(dbg(places), lockfile)
 				end)
 				:unwrapOr(Ok(lockfile))
 				:andThen(function(selection)
@@ -90,7 +91,7 @@ local function install(matches, spinner)
 					return lib.install(cookie, selection):await()
 				end)
 				:inspect(function()
-					print("Successfully installed assets")
+					spinner:complete("Successfully installed assets")
 				end)
 		end
 	)

@@ -6,6 +6,7 @@ local Result = require("@lib/Result")
 local efs = require("@lib/efs")
 
 local Error = require("../Error")
+local constants = require("../constants")
 local types = require("../types")
 
 type Option<T> = Option.Option<T>
@@ -18,7 +19,7 @@ local Some, None = Option.Some, Option.None
 
 local Lockfile = types.Lockfile
 
-local FILE = "rbx-assets.lock"
+local FILE = constants.LOCKFILE
 
 --[=[
 	@within rbx-assets

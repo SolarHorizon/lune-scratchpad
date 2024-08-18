@@ -1,5 +1,6 @@
 --!strict
 local Error = require("./Error")
+local constants = require("./constants")
 local generateConfig = require("./config/generateConfig")
 local generateLockfile = require("./config/generateLockfile")
 local install = require("./install")
@@ -16,6 +17,7 @@ export type RawConfig = types.RawConfig
 
 return {
 	Error = Error,
+	constants = constants,
 	generateConfig = generateConfig,
 	generateLockfile = generateLockfile,
 	install = install,

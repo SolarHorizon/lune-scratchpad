@@ -58,7 +58,7 @@ local function createNewLock(
 	apiKey: string,
 	config: Config,
 	places: Option<Iter<any, string>>
-)
+): Result<Lockfile>
 	local selected = places
 		:map(function(iter: Iter<any, string>)
 			return iter:fold({}, function(accum, _, name)
@@ -90,6 +90,7 @@ local function createNewLock(
 	end
 
 	return Ok({
+		defaultInstaller = config.defaultInstaller,
 		places = lockedPlaces,
 	})
 end

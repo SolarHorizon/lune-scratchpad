@@ -1,11 +1,14 @@
 local roblox = require("@lune/roblox")
 
 local globrex = require("../text/globrex")
+local gt = require("../greentea")
 
-export type Options = {
-	isA: { string }?,
-	names: { string }?,
-}?
+local Options = gt.build(gt.opt({
+	isA = gt.opt(gt.array(gt.string())),
+	names = gt.opt(gt.array(gt.string())),
+}))
+
+export type Options = typeof(Options:type())
 
 type Matcher = (roblox.Instance) -> boolean
 
@@ -20,6 +23,12 @@ local function isA(instance: roblox.Instance, classes: { string })
 end
 
 local function createMatcher(options: Options)
+	local success, err = Options:matches(options)
+
+	if not success then
+		error(err:formatErr())
+	end
+
 	local matchers: { [string]: Matcher } = {}
 
 	if options then

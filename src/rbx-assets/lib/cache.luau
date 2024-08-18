@@ -4,9 +4,11 @@ local serde = require("@lune/serde")
 local dirs = require("@lib/dirs")
 local efs = require("@lib/efs")
 
+local constants = require("./constants")
+
 local function getCacheDir()
 	local root = dirs.getCacheDir() or "./.cache"
-	return efs.makeDirAll(efs.normalizePath(`{root}/rbx-assets`))
+	return efs.makeDirAll(efs.normalizePath(`{root}/{constants.PROG_NAME}`))
 end
 
 local function getAssetFile(placeId: number, version: number)

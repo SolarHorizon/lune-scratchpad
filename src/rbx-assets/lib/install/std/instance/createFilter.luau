@@ -1,13 +1,22 @@
 local roblox = require("@lune/roblox")
 
 local createMatcher = require("./createMatcher")
+local gt = require("../greentea")
 local safeDestroy = require("./safeDestroy")
 
-export type Options = createMatcher.Options & {
-	recursive: boolean,
-}
+local Options = gt.build(gt.opt({
+	recursive = gt.opt(gt.boolean()),
+}))
 
-local function createInstanceFilter(options: Options?)
+export type Options = typeof(Options:type())
+
+local function createFilter(options: Options)
+	local success, err = Options:matches(options)
+
+	if not success then
+		error(err:formatErr())
+	end
+
 	local exclude = createMatcher(options)
 
 	if not options then
@@ -31,4 +40,4 @@ local function createInstanceFilter(options: Options?)
 	end
 end
 
-return createInstanceFilter
+return createFilter

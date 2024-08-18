@@ -5,9 +5,11 @@ local Future = require("@lib/Future")
 local Iter = require("@lib/Iter")
 local Result = require("@lib/Result")
 local batchGetAssets = require("@lib/rbx-api/assets/batchGetAssets")
+local immutable = require("@lib/immutable")
 local withCookie = require("@lib/rbx-api/withCookie")
 
 local Error = require("../Error")
+local cache = require("../cache")
 local download = require("../download")
 local installers = require("./installers")
 local sandbox = require("./sandbox")
@@ -80,14 +82,37 @@ local function downloadBatchResults(cookie, batch: { BatchAsset }, idMap)
 	return new
 end
 
-local function batchGetFromLockfile(
+local function batchGetUncached(cookie, assets, idMap)
+	if next(assets) == nil then
+		return Ok({})
+	end
+
+	return batchGetAssets(cookie, assets)
+		:await()
+		:mapErr(function(err)
+			return Error.BatchGetAssetError(tostring(err))
+		end)
+		:map(function(batch: { BatchAsset })
+			return Future.awaitAll(downloadBatchResults(cookie, batch, idMap))
+		end)
+end
+
+local function getAssetsFromLockfile(
 	cookie,
 	lockfile: Lockfile
 ): Result<{ [string]: LoadedPlace }>
 	local assets: { AssetRequestItem } = {}
 	local idMap = {}
+	local cached = {}
 
 	for name, place in lockfile.places do
+		local cachedAsset = cache.get(place.placeId, place.version)
+
+		if cachedAsset then
+			cached[name] = Ok(roblox.deserializePlace(cachedAsset))
+			continue
+		end
+
 		table.insert(assets, {
 			assetId = place.placeId,
 			version = place.version,
@@ -102,13 +127,9 @@ local function batchGetFromLockfile(
 		})
 	end
 
-	return batchGetAssets(cookie, assets)
-		:await()
-		:mapErr(function(err)
-			return Error.BatchGetAssetError(tostring(err))
-		end)
-		:map(function(batch: { BatchAsset })
-			return Future.awaitAll(downloadBatchResults(cookie, batch, idMap))
+	return batchGetUncached(cookie, assets, idMap)
+		:map(function(results)
+			return immutable.merge(cached, results)
 		end)
 		:andThen(function(results)
 			return prepareDataModels(results, lockfile)
@@ -117,8 +138,10 @@ end
 
 local function buildTree(root: string, tree: InstanceTree)
 	if not fs.isDir(root) then
-		fs.writeDir(root)
+		fs.removeDir(root)
 	end
+
+	fs.writeDir(root)
 
 	if typeof(tree) ~= "table" then
 		fs.writeFile(`{root}.rbxm`, roblox.serializeModel({ tree }))
@@ -166,7 +189,7 @@ end
 
 local install = withCookie(
 	function(cookie: string?, lockfile: Lockfile): Result<{}>
-		return batchGetFromLockfile(cookie, lockfile):andThen(installPlaces)
+		return getAssetsFromLockfile(cookie, lockfile):andThen(installPlaces)
 	end
 )
 

@@ -37,6 +37,7 @@ export type PlaceConfig = typeof(PlaceConfig)
 
 local Config = {
 	places = gt.dictionary(gt.string(), PlaceConfig),
+	defaultInstaller = InstallerConfig,
 }
 
 export type Config = typeof(Config)

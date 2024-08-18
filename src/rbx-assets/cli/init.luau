@@ -4,13 +4,17 @@ local Error = require("@lib/Error")
 local Option = require("@lib/Option")
 local Result = require("@lib/Result")
 local cmd = require("@lib/cmd")
-local commands = require("./commands")
 local progress = require("@lib/progress")
+
+local commands = require("./commands")
+local lib = require("../lib")
 
 local Some = Option.Some
 local Action = cmd.ArgAction
 local Arg = cmd.Arg
 local Command = cmd.Command
+
+local PROG_NAME = lib.constants.PROG_NAME
 
 type Error = Error.Error
 type Result<T> = Result.Result<T, Error>
@@ -26,7 +30,7 @@ local authArgs = {
 		:env("RBX_ASSETS_KEY"),
 	cookie = Arg.new("cookie")
 		:help(
-			"Your ROBLOSECURITY token. Can also be set with the ROBLOSECURITY environment variable. If left unspecified, rbx-assets will try to use the auth cookie from your last logged in Roblox Studio session."
+			`Your ROBLOSECURITY token. Can also be set with the ROBLOSECURITY environment variable. If left unspecified, {PROG_NAME} will try to use the auth cookie from your last logged in Roblox Studio session.`
 		)
 		:long()
 		:short()
@@ -34,7 +38,7 @@ local authArgs = {
 		:env("ROBLOSECURITY"),
 }
 
-local rbxAssets = Command.new("rbx-assets")
+local rbxAssets = Command.new(PROG_NAME)
 	:about("Download & install assets from Roblox")
 	:author("SolarHorizon <matt@solarhorizon.dev>")
 	:version("1.0.0")
@@ -74,11 +78,11 @@ local rbxAssets = Command.new("rbx-assets")
 	)
 	:subcommand(
 		Command.new("init")
-			:about("Create a new rbx-assets.yml file for your project")
+			:about("Create a new {PROG_NAME}.yml file for your project")
 			:arg(
 				Arg.new("edit")
 					:help(
-						"Open rbx-assets.yml in your default text editor after it has been generated."
+						`Open {PROG_NAME}.yml in your default text editor after it has been generated.`
 					)
 					:action(Action.SetTrue)
 					:short()

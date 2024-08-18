@@ -4,6 +4,8 @@ local cmd = require("@lib/cmd")
 local lib = require("../../lib")
 local open = require("@lib/util/open")
 
+local PROG_NAME = lib.constants.PROG_NAME
+
 type Error = lib.Error
 type ArgMatches = cmd.ArgMatches
 
@@ -20,10 +22,10 @@ local function initialize(matches: ArgMatches, _spinner)
 	then
 		return lib.generateConfig(projectPath)
 			:inspect(function()
-				print("rbx-assets initialized")
+				print(`{PROG_NAME} initialized`)
 
 				if edit then
-					open(`{projectPath}/rbx-assets.yaml`)
+					open(`{projectPath}/{PROG_NAME}.yaml`)
 				end
 			end)
 			:map(function()
@@ -31,7 +33,7 @@ local function initialize(matches: ArgMatches, _spinner)
 			end)
 	else
 		return existing:map(function()
-			print("rbx-assets config already exists")
+			print(`{PROG_NAME} config already exists`)
 			return 0
 		end)
 	end
