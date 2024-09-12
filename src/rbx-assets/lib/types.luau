@@ -42,7 +42,8 @@ local Config = {
 
 export type Config = typeof(Config)
 
-local RawPlaceConfig = gtPlaceConfig(gt.oneOf(InstallerConfig, gt.string()))
+local RawPlaceConfig =
+	gtPlaceConfig(gt.opt(gt.oneOf(InstallerConfig, gt.string())))
 
 export type RawPlaceConfig = typeof(RawPlaceConfig)
 
