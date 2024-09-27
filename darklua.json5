@@ -9,4 +9,29 @@
 		},
 		excludes: [ "@lune/**" ],
 	},
+	rules: [
+		"remove_comments",
+		"compute_expression",
+		"filter_after_early_return",
+		"filter_after_early_return",
+		"remove_function_call_parens",
+		"remove_nil_declaration",
+		"remove_spaces",
+		"remove_types",
+		"remove_unused_if_branch",
+		"remove_unused_variable",
+		"remove_unused_while",
+		"remove_empty_do",
+		"remove_method_definition",
+		"convert_index_to_field",
+		{
+			rule: "rename_variables",
+			globals: [ "$default" ],
+		},
+		{
+			rule: "append_text_comment",
+			location: "start",
+			text: "This file was @generated and is not intended to be modified",
+		}
+	]
 }

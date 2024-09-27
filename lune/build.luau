@@ -60,43 +60,54 @@ spinner:start()
 efs.makeDirAll(path)
 
 spawn("darklua", {
-	"process",
-	"--config",
-	darkluaConfig,
-	`src/{project}/{cli}/init.luau`,
-	`{path}/{project}.luau`,
-}):match({
-	Ok = function()
-		for _, target in targets do
-			spinner.text = `{text} ({target})`
+		"process",
+		"--config",
+		darkluaConfig,
+		`src/{project}/{cli}/init.luau`,
+		`{path}/unminified.luau`,
+	})
+	:andThen(function()
+		local result = spawn(
+			"darklua",
+			{ "minify", `{path}/{project}.luau`, `{path}/{project}.luau` }
+		)
 
-			efs.makeDirAll(`{path}/{target}`)
+		fs.removeFile(`{path}/unminified.luau`)
+
+		return result
+	end)
+	:match({
+		Ok = function()
+			for _, target in targets do
+				spinner.text = `{text} ({target})`
+
+				efs.makeDirAll(`{path}/{target}`)
+
+				spinner:stop()
+
+				spawn("lune", {
+					"build",
+					"--target",
+					target,
+					"--output",
+					`{path}/{target}/{project}`,
+					`{path}/{project}.luau`,
+				}):match({
+					Ok = function(result: process.SpawnResult)
+						spinner:start()
+						return result
+					end,
+					Err = function(result: process.SpawnResult)
+						term.errPrint(`Failed to build for target {target}`)
+						return result
+					end,
+				})
+			end
 
 			spinner:stop()
-
-			spawn("lune", {
-				"build",
-				"--target",
-				target,
-				"--output",
-				`{path}/{target}/{project}`,
-				`{path}/{project}.luau`,
-			}):match({
-				Ok = function(result: process.SpawnResult)
-					spinner:start()
-					return result
-				end,
-				Err = function(result: process.SpawnResult)
-					term.errPrint(`Failed to build for target {target}`)
-					return result
-				end,
-			})
-		end
-
-		spinner:stop()
-	end,
-	Err = function(err: process.SpawnResult)
-		spinner:stop()
-		term.errPrint(err.stderr)
-	end,
-})
+		end,
+		Err = function(err: process.SpawnResult)
+			spinner:stop()
+			term.errPrint(err.stderr)
+		end,
+	})
