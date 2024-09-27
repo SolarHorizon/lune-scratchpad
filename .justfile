@@ -1,7 +1,7 @@
 # Build & install a binary package
-install package name:
+install package:
 	lune run build {{package}} linux-x86_64
-	cp build/{{package}}/linux-x86_64/{{package}} ~/bin/{{name}}
+	cp build/{{package}}/linux-x86_64/{{package}} ~/bin/{{package}}
 
 # Build a binary package
 build package:
