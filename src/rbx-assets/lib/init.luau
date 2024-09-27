@@ -1,9 +1,10 @@
 --!strict
 local Error = require("./Error")
 local constants = require("./constants")
+local download = require("./assets/download")
 local generateConfig = require("./config/generateConfig")
 local generateLockfile = require("./config/generateLockfile")
-local install = require("./install")
+local install = require("./assets/install")
 local readConfig = require("./config/readConfig")
 local readLockfile = require("./config/readLockfile")
 local types = require("./types")
@@ -21,6 +22,7 @@ return {
 	generateConfig = generateConfig,
 	generateLockfile = generateLockfile,
 	install = install,
+	download = download,
 	readConfig = readConfig,
 	readLockfile = readLockfile,
 	types = types,

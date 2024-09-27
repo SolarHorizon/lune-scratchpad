@@ -1,6 +1,6 @@
 local roblox = require("@lune/roblox")
 
-local global = require("../types")
+local global = require("../../types")
 
 export type Lockfile = global.Lockfile
 export type InstallerConfig = global.InstallerConfig

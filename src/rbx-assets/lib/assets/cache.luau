@@ -4,7 +4,7 @@ local serde = require("@lune/serde")
 local dirs = require("@lib/dirs")
 local efs = require("@lib/efs")
 
-local constants = require("./constants")
+local constants = require("../constants")
 
 local function getCacheDir()
 	local root = dirs.getCacheDir() or "./.cache"

@@ -78,7 +78,7 @@ local rbxAssets = Command.new(PROG_NAME)
 	)
 	:subcommand(
 		Command.new("init")
-			:about("Create a new {PROG_NAME}.yml file for your project")
+			:about(`Create a new {PROG_NAME}.yml file for your project`)
 			:arg(
 				Arg.new("edit")
 					:help(
@@ -107,11 +107,10 @@ type Subcommand = {
 	name: string,
 }
 
-local function runWith(args: { string }): Result<number>
+local function runWithMatches(matches: cmd.ArgMatches)
 	local spinner = progress.Spinner.new()
 
-	return rbxAssets
-		:getMatchesFrom(args)
+	return matches
 		:getSubcommand()
 		:andThen(function(subcommand: Subcommand)
 			return Some(commands[subcommand.name]):map(function(run)
@@ -130,12 +129,17 @@ local function runWith(args: { string }): Result<number>
 		})
 end
 
+local function runWith(args: { string }): Result<number>
+	return runWithMatches(rbxAssets:getMatchesFrom(args))
+end
+
 local function run()
 	return runWith(process.args)
 end
 
 return {
 	command = rbxAssets,
-	runWith = runWith,
 	run = run,
+	runWith = runWith,
+	runWithMatches = runWithMatches,
 }

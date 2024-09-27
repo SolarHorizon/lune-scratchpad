@@ -5,6 +5,7 @@
 local process = require("@lune/process")
 local stdio = require("@lune/stdio")
 
+local Option = require("@lib/Option")
 local Result = require("@lib/Result")
 local term = require("@lib/term")
 
@@ -21,6 +22,7 @@ type Error = Error.Error
 type Result<T> = Result.Result<T, Error>
 
 local Ok, Err = Result.Ok, Result.Err
+local Some = Option.Some
 local color = term.color
 
 -- tabs are not always 4 spaces on every terminal

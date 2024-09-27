@@ -25,7 +25,7 @@ local function childrenOf(
 			if children[name] then
 				print(
 					`Skipping '{name}' because it already exists.`
-						.. "Consider renaming any duplicate instances."
+						.. " Consider renaming any duplicate instances."
 				)
 				continue
 			end

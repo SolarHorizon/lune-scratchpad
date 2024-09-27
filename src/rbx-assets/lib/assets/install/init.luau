@@ -9,7 +9,7 @@ local efs = require("@lib/efs")
 local immutable = require("@lib/immutable")
 local withCookie = require("@lib/rbx-api/withCookie")
 
-local Error = require("../Error")
+local Error = require("../../Error")
 local cache = require("../cache")
 local download = require("../download")
 local installers = require("./installers")

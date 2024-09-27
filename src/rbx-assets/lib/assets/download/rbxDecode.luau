@@ -4,7 +4,7 @@ local serde = require("@lune/serde")
 local Result = require("@lib/Result")
 local decode = require("@lib/request/decode")
 
-local Error = require("../Error")
+local Error = require("../../Error")
 
 local Ok = Result.Ok
 

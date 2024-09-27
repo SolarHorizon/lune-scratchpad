@@ -13,9 +13,9 @@ local installer = require("./std/installer")
 local instance = require("./std/instance")
 local text = require("./std/text")
 
-local Error = require("../Error")
+local Error = require("../../Error")
 local Result = require("@lib/Result")
-local constants = require("../constants")
+local constants = require("../../constants")
 local types = require("./types")
 
 type Error = Error.Error

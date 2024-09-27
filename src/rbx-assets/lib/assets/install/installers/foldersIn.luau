@@ -65,17 +65,17 @@ local function foldersIn(game: roblox.Instance, options: typeof(Options:type()))
 				if exists then
 					print(
 						`Skipping '{name}' because it already exists.`
-							.. "Consider renaming any duplicate instances."
+							.. " Consider renaming any duplicate instances."
 					)
 					continue
 				end
 
 				if recursive then
-					folders[name] = collectFolders(child, recursive)
-				else
-					folders[name] = child
+					child = collectFolders(child, recursive) :: any
 				end
 			end
+
+			folders[name] = child
 		end
 
 		return folders
@@ -84,7 +84,7 @@ local function foldersIn(game: roblox.Instance, options: typeof(Options:type()))
 	local root = {}
 
 	for _, path in options.roots do
-		local tree = collectFolders(instance.find(game, path))
+		local tree = collectFolders(instance.find(game, path), options.recursive)
 
 		if typeof(tree) ~= "table" then
 			warn("Non-folder instance at root", tree.ClassName, tree.Name)
