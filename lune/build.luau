@@ -40,15 +40,10 @@ local function spawn(program, params)
 	return Result.fromSpawnResult(process.spawn(program, params))
 end
 
-local path = `./build/{project}`
+local buildPath = `./build/{project}`
 local text = `Building {project}...`
-local cli = "cli"
 
-if not fs.isFile(`src/{project}/{cli}`) then
-	cli = "bin"
-end
-
-local darkluaConfig = `src/{project}/{cli}/darklua.json5`
+local darkluaConfig = `src/{project}/bin/darklua.json5`
 
 if not fs.isFile(darkluaConfig) then
 	darkluaConfig = "./darklua.json5"
@@ -57,42 +52,63 @@ end
 local spinner = progress.Spinner.new({ text = text })
 spinner:start()
 
-efs.makeDirAll(path)
+efs.makeDirAll(buildPath)
 
 spawn("darklua", {
 		"process",
 		"--config",
 		darkluaConfig,
-		`src/{project}/{cli}/init.luau`,
-		`{path}/unminified.luau`,
+		`src/{project}/bin/init.luau`,
+		`{buildPath}/unminified.luau`,
 	})
 	:andThen(function()
-		local result = spawn(
-			"darklua",
-			{ "minify", `{path}/unminified.luau`, `{path}/{project}.luau` }
-		)
+		local result = spawn("darklua", {
+			"minify",
+			`{buildPath}/unminified.luau`,
+			`{buildPath}/{project}.luau`,
+		})
 
-		fs.removeFile(`{path}/unminified.luau`)
+		fs.removeFile(`{buildPath}/unminified.luau`)
 
 		return result
 	end)
 	:match({
 		Ok = function()
+			local version = ""
+
+			if
+				fs.isFile(`src/{project}/cli`)
+				or fs.isFile(`src/{project}/cli/init.luau`)
+			then
+				local cli = require(`../src/{project}/cli`)
+
+				if typeof(cli) == "table" then
+					if
+						cli.command
+						and cli.command._config
+						and cli.command._config.version
+					then
+						version = `-{cli.command._config.version}`
+					end
+				end
+			end
+
 			for _, target in targets do
 				spinner.text = `{text} ({target})`
 
-				efs.makeDirAll(`{path}/{target}`)
-
 				spinner:stop()
+
+				efs.makeDirAll(`{buildPath}/{project}{version}-{target}`)
 
 				local result = spawn("lune", {
 					"build",
 					"--target",
 					target,
 					"--output",
-					`{path}/{target}/{project}`,
-					`{path}/{project}.luau`,
+					`{buildPath}/{project}{version}-{target}/{project}`,
+					`{buildPath}/{project}.luau`,
 				}):inspect(function(result: process.SpawnResult)
+					print(result)
 					spinner:start()
 				end)
 
