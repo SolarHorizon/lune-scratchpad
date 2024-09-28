@@ -69,7 +69,7 @@ spawn("darklua", {
 	:andThen(function()
 		local result = spawn(
 			"darklua",
-			{ "minify", `{path}/{project}.luau`, `{path}/{project}.luau` }
+			{ "minify", `{path}/unminified.luau`, `{path}/{project}.luau` }
 		)
 
 		fs.removeFile(`{path}/unminified.luau`)
@@ -85,26 +85,26 @@ spawn("darklua", {
 
 				spinner:stop()
 
-				spawn("lune", {
+				local result = spawn("lune", {
 					"build",
 					"--target",
 					target,
 					"--output",
 					`{path}/{target}/{project}`,
 					`{path}/{project}.luau`,
-				}):match({
-					Ok = function(result: process.SpawnResult)
-						spinner:start()
-						return result
-					end,
-					Err = function(result: process.SpawnResult)
-						term.errPrint(`Failed to build for target {target}`)
-						return result
-					end,
-				})
+				}):inspect(function(result: process.SpawnResult)
+					spinner:start()
+				end)
+
+				if result:isErr() then
+					return term.errPrint(
+						`Failed to build for target {target}`,
+						result:unwrapErr().stderr
+					)
+				end
 			end
 
-			spinner:stop()
+			return spinner:stop()
 		end,
 		Err = function(err: process.SpawnResult)
 			spinner:stop()
