@@ -8,7 +8,10 @@ local term = require("@lib/term")
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 
+local Ok = Result.Ok
+
 local project = process.args[1]
+local zipped = process.args[2] == "--zip"
 
 local systems = {
 	"linux",
@@ -23,6 +26,10 @@ local arches = {
 
 local targets = table.clone(process.args)
 table.remove(targets, 1)
+
+if zipped then
+	table.remove(targets, 1)
+end
 
 if #targets <= 0 then
 	for _, system in systems do
@@ -98,18 +105,29 @@ spawn("darklua", {
 
 				spinner:stop()
 
-				efs.makeDirAll(`{buildPath}/{project}{version}-{target}`)
+				local outputPath = `{buildPath}/{project}{version}-{target}`
+				local outputFile = `{outputPath}/{project}`
+
+				efs.makeDirAll(outputPath)
 
 				local result = spawn("lune", {
 					"build",
 					"--target",
 					target,
 					"--output",
-					`{buildPath}/{project}{version}-{target}/{project}`,
+					outputFile,
 					`{buildPath}/{project}.luau`,
-				}):inspect(function(result: process.SpawnResult)
-					print(result)
+				}):andThen(function(result: process.SpawnResult)
 					spinner:start()
+
+					if zipped then
+						return spawn(
+							"zip",
+							{ "-rm", `{outputPath}.zip`, outputPath }
+						)
+					end
+
+					return Ok()
 				end)
 
 				if result:isErr() then
