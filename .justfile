@@ -10,3 +10,7 @@ build package:
 # Run a binary package
 @run package *args:
 	lune run src/{{package}}/bin -- {{args}}
+
+# Test a binary package
+@test package *args:
+	lune run src/{{package}}/test -- {{args}}
