@@ -3,7 +3,7 @@ local process = require("@lune/process")
 local openers = {
 	linux = { "xdg-open" },
 	macos = { "open" },
-	windows = { "powershell", "-c", "Start-Process" },
+	windows = { "explorer" },
 }
 
 --[=[
